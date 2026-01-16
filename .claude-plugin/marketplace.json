@@ -1,0 +1,23 @@
+{
+  "name": "development",
+  "owner": {
+    "name": "Juni Yadi",
+    "email": "me@juniyadi.id"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for Development"
+  },
+  "plugins": [
+    {
+      "name": "issue-reviews",
+      "source": "./issue-reviews",
+      "description": "Analyze and review GitHub issues to provide insights and suggestions for improvement.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Juni Yadi",
+        "email": "me@juniyadi.id"
+      },
+      "category": "productivity"
+    }
+  ]
+}
