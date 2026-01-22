@@ -18,6 +18,17 @@
         "email": "me@juniyadi.id"
       },
       "category": "productivity"
+    },
+    {
+      "name": "git-helper",
+      "source": "./git-helper",
+      "description": "Some useful git commands helper.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Juni Yadi",
+        "email": "me@juniyadi.id"
+      },
+      "category": "productivity"
     }
   ]
 }
