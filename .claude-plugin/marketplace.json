@@ -29,6 +29,17 @@
         "email": "me@juniyadi.id"
       },
       "category": "productivity"
+    },
+    {
+      "name": "super-dev",
+      "source": "./super-dev",
+      "description": "Create new feature with 5 judge criteria with different personality.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Juni Yadi",
+        "email": "me@juniyadi.id"
+      },
+      "category": "productivity"
     }
   ]
 }
