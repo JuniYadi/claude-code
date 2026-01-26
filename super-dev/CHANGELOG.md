@@ -1,6 +1,6 @@
 # Super-Dev Changelog
 
-## [1.2.0] - 2026-01-26
+## [1.3.0] - 2026-01-26
 
 ### Fixed - Critical Visibility and Role Issues
 
@@ -110,10 +110,10 @@ None. This is a bug fix release that restores intended behavior.
 
 ### Migration Notes
 
-No migration needed. Users running v1.0 or v1.1 will automatically get the visibility fixes when they upgrade to v1.2.0.
+No migration needed. Users running v1.0, v1.1, or v1.2 will automatically get the visibility fixes when they upgrade to v1.3.0.
 
 ---
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 **Date:** 2026-01-26
 **Author:** JuniYadi
