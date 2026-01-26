@@ -1,3 +1,8 @@
+---
+name: proposal-builder
+description: Transform vague feature requests into structured proposals through interactive Q&A.
+---
+
 # Proposal Builder
 
 Transform vague feature requests into structured proposals through interactive Q&A.

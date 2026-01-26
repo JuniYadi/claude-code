@@ -1,3 +1,8 @@
+---
+name: codebase-analyzer
+description: Understand existing codebase patterns and context to inform feature judgement.
+---
+
 # Codebase Analyzer
 
 Understand existing codebase patterns and context to inform feature judgement.

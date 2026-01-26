@@ -1,3 +1,8 @@
+---
+name: vote-aggregator
+description: Combine 5 independent judge verdicts into actionable final recommendation.
+---
+
 # Vote Aggregator
 
 Combine 5 independent judge verdicts into actionable final recommendation.

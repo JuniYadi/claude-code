@@ -1,3 +1,8 @@
+---
+name: feature-parser
+description: Extract structured information from markdown feature proposals.
+---
+
 # Feature Parser
 
 Extract structured information from markdown feature proposals.

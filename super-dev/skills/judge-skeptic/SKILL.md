@@ -1,3 +1,8 @@
+---
+name: judge-skeptic
+description: Evaluate features based on risk identification, security, and thorough analysis.
+---
+
 # Judge: Skeptic
 
 **Philosophy:** "What could go wrong?"

@@ -1,3 +1,8 @@
+---
+name: super-dev
+description: Multi-agent feature planning with 5-perspective judgement system.
+---
+
 # Super-Dev: Multi-Agent Feature Planning
 
 Multi-agent feature planning with 5-perspective judgement system for validating new features before implementation.
