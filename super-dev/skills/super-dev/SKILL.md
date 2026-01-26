@@ -7,6 +7,22 @@ description: Multi-agent feature planning with 5-perspective judgement system.
 
 Multi-agent feature planning with 5-perspective judgement system for validating new features before implementation.
 
+## ⚠️ CRITICAL: Role Definition
+
+**This skill is PLANNING and INSPECTION ONLY:**
+- ✅ Analyze proposals
+- ✅ Evaluate with 5 judges
+- ✅ Provide recommendations
+- ❌ Do NOT implement features
+- ❌ Do NOT make code changes
+- ❌ Do NOT create files
+
+**Output Requirement:**
+When running as a sub-agent, you MUST output the complete formatted report with ALL judge verdicts. Do not summarize. Do not internalize. OUTPUT the full report so the user can see it.
+
+**Stop After Planning:**
+After presenting the final report, STOP. Do not ask if the user wants to implement. Do not offer to implement. Your job is done after evaluation.
+
 ## Purpose
 
 Transform vague feature requests into structured proposals, then evaluate them through 5 independent judge agents (Pragmatist, Purist, Innovator, Skeptic, Optimizer) to produce actionable go/no-go decisions.
@@ -151,7 +167,7 @@ Task 5: @skills/judge-optimizer
 
 Wait for all 5 agents to complete.
 
-Collect results:
+Collect results and OUTPUT them immediately:
 verdicts = [
     {judgeName: "Pragmatist", verdict: "APPROVE", ...},
     {judgeName: "Purist", verdict: "REJECT", ...},
@@ -159,6 +175,16 @@ verdicts = [
     {judgeName: "Skeptic", verdict: "REJECT", ...},
     {judgeName: "Optimizer", verdict: "APPROVE", ...}
 ]
+
+IMPORTANT: After collecting verdicts, output a summary:
+"✅ All 5 judges completed:
+- Pragmatist: APPROVE
+- Purist: REJECT
+- Innovator: APPROVE
+- Skeptic: REJECT
+- Optimizer: APPROVE"
+
+This ensures visibility when running in sub-agent.
 ```
 
 **Error Handling:**
@@ -194,8 +220,10 @@ Output: FinalRecommendation object with formatted report
 
 ### Phase 4: Present Final Report to User
 
+**CRITICAL: This skill is for PLANNING and INSPECTION ONLY. Do NOT implement the feature.**
+
 ```markdown
-Display the complete report from vote-aggregator:
+Output the complete report from vote-aggregator:
 
 ## 🎯 Feature Review: [Title]
 
@@ -203,7 +231,7 @@ Display the complete report from vote-aggregator:
 **Vote Breakdown:** X Approve, Y Reject
 
 ### 📊 Judge Verdicts
-[Summary from each judge]
+[Summary from each judge with full reasoning]
 
 <details>
 <summary>📋 Detailed Analysis</summary>
@@ -215,10 +243,26 @@ Display the complete report from vote-aggregator:
 
 ---
 
+IMPORTANT OUTPUT REQUIREMENTS:
+1. **You MUST output the COMPLETE formatted report above** - do not summarize
+2. **Include ALL judge verdicts** with their reasoning (Pragmatist, Purist, Innovator, Skeptic, Optimizer)
+3. **Show the detailed analysis section** with strengths, concerns, and recommendations
+4. **Display clear next steps** so user knows what to do
+5. **STOP after outputting the report** - do NOT ask if user wants to implement
+6. **STOP after outputting the report** - do NOT start implementing the feature
+
+Your role is ADVISORY ONLY:
+- Analyze and evaluate the proposal ✅
+- Provide multi-perspective feedback ✅
+- Recommend next steps ✅
+- Implement the feature ❌
+- Make code changes ❌
+- Create files ❌
+
 User can now:
-- Proceed with implementation (if APPROVED)
-- Revise proposal (if NEEDS_REVISION)
-- Redesign approach (if REJECTED)
+- Proceed with implementation (if APPROVED) - on their own or by asking you separately
+- Revise proposal (if NEEDS_REVISION) - and rerun super-dev
+- Redesign approach (if REJECTED) - and rerun super-dev
 ```
 
 ## Implementation Notes
@@ -260,10 +304,22 @@ Phase 2: "👥 Launching 5 judge agents in parallel..."
          "⏳ Pragmatist analyzing..."
          "⏳ Purist analyzing..."
          ...
-         "✅ All judges completed"
+         "✅ All 5 judges completed:
+            - Pragmatist: APPROVE
+            - Purist: REJECT
+            - Innovator: APPROVE
+            - Skeptic: REJECT
+            - Optimizer: APPROVE"
 Phase 3: "📊 Aggregating verdicts..."
 Phase 4: "✅ Final report ready"
-         [Display full report]
+
+         [OUTPUT THE COMPLETE FORMATTED REPORT - DO NOT SUMMARIZE]
+
+         Then STOP. Do not continue to implementation.
+```
+
+**CRITICAL for Sub-Agent Execution:**
+When running as a sub-agent via Task tool, the final report MUST be outputted in full, not just processed internally. The user cannot see internal processing - only explicit output messages are visible.
 ```
 
 ### Performance Expectations
@@ -366,7 +422,12 @@ Does this capture what you need?
    ⏳ Skeptic analyzing...
    ⏳ Optimizer analyzing...
 
-✅ All judges completed
+✅ All 5 judges completed:
+   - Pragmatist: APPROVE
+   - Purist: REJECT
+   - Innovator: APPROVE
+   - Skeptic: REJECT
+   - Optimizer: APPROVE
 
 📊 Aggregating verdicts...
 ✅ Final report ready
