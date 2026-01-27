@@ -1,5 +1,68 @@
 # Super-Dev Changelog
 
+## [1.4.0] - 2026-01-27
+
+### Fixed - Skill Configuration and Invocation
+
+#### Issue 1: Skill Not User-Invocable
+**Problem:** The `/super-dev` command failed with "No task found with ID: super-dev:super-dev"
+
+**Root Cause:** The main skill `skills/super-dev/SKILL.md` lacked `user-invocable: true` in its YAML frontmatter, preventing users from invoking it directly.
+
+**Solution:** Added `user-invocable: true` and comprehensive trigger phrases to the skill metadata.
+
+#### Issue 2: Incorrect Skill Reference in Command
+**Problem:** Command file referenced skill with wrong syntax (`super-dev:super-dev`)
+
+**Root Cause:** The command used `super-dev:super-dev` instead of the correct `@skills/super-dev` syntax.
+
+**Solution:** Updated command file to use `@skills/super-dev` for proper skill invocation.
+
+#### Issue 3: Missing Commands Field in Plugin Manifest
+**Problem:** Plugin manifest didn't explicitly declare the commands directory.
+
+**Root Cause:** The `plugin.json` lacked the `commands` field to indicate where command files are located.
+
+**Solution:** Added `"commands": "./commands"` to the plugin manifest.
+
+### Changes Summary
+
+#### Modified Files
+1. **skills/super-dev/SKILL.md**
+   - Added `user-invocable: true`
+   - Added trigger phrases: "plan a feature", "evaluate a feature", "review a feature proposal", etc.
+
+2. **commands/super-dev.md**
+   - Changed `super-dev:super-dev` → `@skills/super-dev`
+
+3. **.claude-plugin/plugin.json**
+   - Added `"commands": "./commands"`
+   - Updated version to 1.4.0
+
+### Expected Behavior After Fix
+
+**Before:**
+```
+User: /super-dev add notifications
+Error: No task found with ID: super-dev:super-dev
+```
+
+**After:**
+```
+User: /super-dev add notifications
+🚀 Super-Dev: Multi-Agent Feature Review
+[Proceeds with proposal builder Q&A]
+```
+
+### Testing Recommendations
+
+1. Test command invocation: `/super-dev add notifications`
+2. Verify skill properly launches the proposal builder
+3. Verify all 5 judge agents run in parallel
+4. Verify final report is displayed correctly
+
+---
+
 ## [1.3.0] - 2026-01-26
 
 ### Fixed - Critical Visibility and Role Issues
