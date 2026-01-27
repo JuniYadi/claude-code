@@ -3,4 +3,4 @@ description: "Multi-agent feature planning with 5-perspective judgement system f
 disable-model-invocation: false
 ---
 
-Invoke the super-dev:super-dev skill and follow it exactly as presented to you
+Invoke the @skills/super-dev skill and follow it exactly as presented to you
