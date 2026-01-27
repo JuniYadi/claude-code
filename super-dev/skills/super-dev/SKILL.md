@@ -1,6 +1,7 @@
 ---
 name: super-dev
-description: Multi-agent feature planning with 5-perspective judgement system.
+user-invocable: true
+description: This skill should be used when the user asks to "plan a feature", "evaluate a feature", "review a feature proposal", "analyze a feature before implementation", "plan a feature", "review this feature", "assess this feature", or uses the /super-dev command for multi-agent feature planning with 5-perspective judgment system.
 ---
 
 # Super-Dev: Multi-Agent Feature Planning

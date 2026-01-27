@@ -1,7 +1,8 @@
 {
     "name": "super-dev",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Multi-agent feature planning with 5-perspective judgement system for validating new features before implementation",
+    "commands": "./commands",
     "author": {
         "name": "Juni Yadi",
         "email": "me@juniyadi.id"
