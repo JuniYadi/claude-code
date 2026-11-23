@@ -1,0 +1,11 @@
+{
+  "scopes": ["app"],
+  "adrDir": "docs/adr",
+  "prdPaths": ["docs/prd/*.md"],
+  "governed": ["src/**/*.{ts,tsx,js,jsx,mjs}"],
+  "exempt": ["**/*.d.ts", "**/generated/**"],
+  "protected": [],
+  "testCommand": "",
+  "rules": [],
+  "requireUseCase": true
+}
