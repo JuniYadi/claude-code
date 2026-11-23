@@ -1,9 +1,0 @@
-{
-    "name": "issue-reviews",
-    "version": "1.0.0",
-    "description": "Agent that analyzes and reviews GitHub issues to provide insights and suggestions for improvement",
-    "author": {
-        "name": "Juni Yadi",
-        "email": "me@juniyadi.id"
-    }
-}
