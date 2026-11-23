@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-plugins",
+  "name": "juniyadi-plugins",
   "owner": { "name": "JuniYadi" },
   "metadata": { "description": "Claude Code plugins for development workflows" },
   "plugins": [
