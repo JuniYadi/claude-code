@@ -1,0 +1,33 @@
+name: decision-protocol
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  decision-protocol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Decisions, tags and status
+        run: node .decision-protocol/dp.mjs check
+      - name: Commit messages
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          for c in $(git rev-list "origin/$BASE_REF..HEAD"); do
+            git log -1 --format=%B "$c" > "$RUNNER_TEMP/msg"
+            node .decision-protocol/dp.mjs commit-msg "$RUNNER_TEMP/msg" --commit "$c"
+          done
+      # If your tests need a database, add a throwaway service container
+      # (for example a postgres service) above this step and pass its URL
+      # through "env". Never point CI at a shared database.
+      - name: Tests
+        run: node .decision-protocol/dp.mjs run-tests

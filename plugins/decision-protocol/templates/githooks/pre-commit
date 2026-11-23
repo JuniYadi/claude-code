@@ -1,0 +1,14 @@
+#!/bin/sh
+# decision-protocol git hook (vendored). Silent no-op when the repository has no decision-protocol.config.json.
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -f "$root/decision-protocol.config.json" ] || exit 0
+dp="$root/.decision-protocol/dp.mjs"
+if [ ! -f "$dp" ]; then
+  echo "decision-protocol: $dp is missing. Restore it from version control or re-run the init skill." >&2
+  exit 1
+fi
+if ! command -v node >/dev/null 2>&1; then
+  echo "decision-protocol: Node.js 18 or newer is required to run this hook. Install it (https://nodejs.org) and retry." >&2
+  exit 1
+fi
+exec node "$dp" --root "$root" guard-env
