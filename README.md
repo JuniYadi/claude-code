@@ -8,7 +8,7 @@ Flow: PRD use case, then ADR decision (`proposed`; a human accepts it), then cod
 
 ```sh
 claude plugin marketplace add JuniYadi/claude-code
-claude plugin install decision-protocol@claude-code-plugins
+claude plugin install decision-protocol@juniyadi-plugins
 ```
 
 ## Requirements
