@@ -18,6 +18,13 @@ if ! command -v node >/dev/null 2>&1; then
   exit 0
 fi
 
+# Trust: run nothing from the repository (vendored checker, rule modules, test command) until the user trusted it.
+# trust.mjs only reads and hashes files. It prints the explanation and exits non-zero when the repo is not trusted.
+if ! out="$(node "$here/trust.mjs" verify --root "$root" --mode "$mode")"; then
+  printf '%s\n' "$out"
+  exit 0
+fi
+
 case "$mode" in
   gate) exec node "$checker" --root "$root" gate ;;
   check-file) exec node "$checker" --root "$root" check --stdin ;;
