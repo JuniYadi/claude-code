@@ -3,16 +3,26 @@
 // Commands: check [--stdin] | status | commit-msg <file> [--commit <sha>] | gate | run-tests | guard-env | version
 // Global option: --root <dir> (default: git top level of the working directory).
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 /** Replaced with the plugin version when the checker is vendored into a repository. */
 export const VERSION = "__DP_VERSION__";
 
-const ID = /ADR-\d{4}\.D\d+/g;
-const STATES = ["proposed", "accepted", "superseded", "rejected"];
-const FIX_FIELDS = ["observed", "expected", "cause", "impact"];
+const DECISION_ID = /ADR-[0-9]{4}\.D[0-9]+/g;
+const STATES = [
+  "proposed",
+  "accepted",
+  "superseded",
+  "rejected",
+];
+const FIX_FIELDS = [
+  "observed",
+  "expected",
+  "cause",
+  "impact",
+];
 const CONFIG_FILE = "decision-protocol.config.json";
 const JS_FILE = /\.(?:[cm]?[jt]sx?)$/;
 const ENV_ALLOWED = /^\.env\.(example|sample|template|dist)$/;
@@ -161,292 +171,355 @@ export function parseYaml(text) {
 }
 
 // ---- configuration ------------------------------------------------------
+const DEFAULT_TEST_PATTERNS = ["**/*.test.*", "**/*.spec.*", "**/*_test.*", "**/test_*.py", "**/test/**", "**/tests/**", "**/__tests__/**"];
+
+/** Accepts only project-relative paths that stay inside the project. Returns the normalized path. */
+export function safeRelPath(name, value) {
+  if (typeof value !== "string" || !value.trim()) throw new Error(`"${name}" must be a non-empty string`);
+  const v = value.replace(/\\/g, "/");
+  if (v.startsWith("/") || /^[A-Za-z]:/.test(v)) throw new Error(`"${name}" must be relative to the project (got '${value}')`);
+  const norm = posix.normalize(v);
+  if (norm.split("/").includes("..")) throw new Error(`"${name}" must stay inside the project (got '${value}')`);
+  return norm.replace(/\/+$/, "") || ".";
+}
+
+function stringList(raw, key, fallback) {
+  const v = raw[key] ?? fallback;
+  if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) throw new Error(`"${key}" must be an array of strings`);
+  return v;
+}
+
 export function loadConfig(root) {
-  const f = join(root, CONFIG_FILE);
-  if (!existsSync(f)) return null;
-  const raw = JSON.parse(readFileSync(f, "utf8"));
-  const adrDir = String(raw.adrDir ?? "docs/adr").replace(/\/+$/, "");
+  const file = join(root, CONFIG_FILE);
+  if (!existsSync(file)) return null;
+  const raw = JSON.parse(readFileSync(file, "utf8"));
+  const adrDir = safeRelPath("adrDir", raw.adrDir ?? "docs/adr");
+  const prdPaths = stringList(raw, "prdPaths", ["docs/prd/*.md"]);
+  prdPaths.forEach((g) => safeRelPath("prdPaths", g));
+  const rules = stringList(raw, "rules", []);
+  rules.forEach((r) => safeRelPath("rules", r));
   return {
-    scopes: raw.scopes ?? [],
+    scopes: stringList(raw, "scopes", []),
     adrDir,
-    prdPaths: raw.prdPaths ?? ["docs/prd/*.md"],
-    governed: raw.governed ?? [],
-    exempt: raw.exempt ?? [],
-    protected: raw.protected ?? [],
-    testPatterns: raw.testPatterns ?? [
-      "**/*.test.*",
-      "**/*.spec.*",
-      "**/*_test.*",
-      "**/test_*.py",
-      "**/test/**",
-      "**/tests/**",
-      "**/__tests__/**",
-    ],
-    testCommand: raw.testCommand ?? "",
-    rules: raw.rules ?? [],
-    commitTypes: raw.commitTypes ?? ["feat", "fix", "refactor", "test", "perf"],
+    prdPaths,
+    governed: stringList(raw, "governed", []),
+    exempt: stringList(raw, "exempt", []),
+    protected: stringList(raw, "protected", []),
+    testPatterns: stringList(raw, "testPatterns", DEFAULT_TEST_PATTERNS),
+    testCommand: String(raw.testCommand ?? ""),
+    rules,
+    commitTypes: stringList(raw, "commitTypes", ["feat", "fix", "refactor", "test", "perf"]),
     requireUseCase: raw.requireUseCase ?? true,
-    statusFile: raw.statusFile ?? `${adrDir}/STATUS.md`,
+    statusFile: safeRelPath("statusFile", raw.statusFile ?? `${adrDir}/STATUS.md`),
   };
 }
 
 const isTest = (c, p) => matches(c.testPatterns, p);
 export const isGoverned = (c, p) => matches(c.governed, p) && !matches(c.exempt, p) && !isTest(c, p);
 const isProtectedFile = (c, p) => matches(c.protected, p) && !matches(c.exempt, p) && !isTest(c, p);
+const coveredBy = (decision, p) => matches(decision.paths, p);
 
 function listFiles(root) {
   const r = spawnSync("git", ["ls-files", "-co", "--exclude-standard", "-z"], { cwd: root, encoding: "utf8" });
-  if (r.status === 0)
-    return r.stdout
-      .split("\0")
-      .filter((f) => f && existsSync(join(root, f)))
-      .sort();
-  const out = [];
-  const rec = (rel) => {
-    for (const e of readdirSync(join(root, rel), { withFileTypes: true })) {
-      const q = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) e.name !== "node_modules" && e.name !== ".git" && rec(q);
-      else out.push(q);
+  if (r.status === 0) return r.stdout.split("\0").filter((f) => f && existsSync(join(root, f))).sort();
+  const found = [];
+  const descend = (dir) => {
+    for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+      const rel = dir ? `${dir}/${entry.name}` : entry.name;
+      if (!entry.isDirectory()) found.push(rel);
+      else if (entry.name !== "node_modules" && entry.name !== ".git") descend(rel);
     }
   };
-  rec("");
-  return out.sort();
+  descend("");
+  return found.sort();
+}
+
+/** Writes a file below root, refusing targets that resolve (through symlinks) outside it. */
+function writeInside(root, rel, text) {
+  const abs = resolve(root, rel);
+  mkdirSync(dirname(abs), { recursive: true });
+  const realRoot = realpathSync(root);
+  const realDir = realpathSync(dirname(abs));
+  if (realDir !== realRoot && !realDir.startsWith(realRoot + sep)) throw new Error(`${rel} resolves outside the project`);
+  writeFileSync(abs, text);
 }
 
 // ---- loading decisions and use cases ------------------------------------
 export function load(root, config, files = listFiles(root)) {
-  const ctx = { root, config, decisions: new Map(), protectedPaths: [], useCases: new Set(), errors: [] };
+  const ctx = { root, config, decisions: new Map(), useCases: new Set(), problems: [] };
+  const complain = (msg) => ctx.problems.push(msg);
+  const numbers = new Map();
   const adrFiles = files.filter((f) => f.startsWith(`${config.adrDir}/`) && /^\d{4}-[^/]*\.md$/.test(posix.basename(f)));
-  const seen = new Map();
-  for (const f of adrFiles) {
-    const base = posix.basename(f);
-    const sub = posix.dirname(f.slice(config.adrDir.length + 1));
-    const scope = sub === "." ? "default" : sub.split("/")[0];
+
+  for (const file of adrFiles) {
+    const num = posix.basename(file).slice(0, 4);
+    const folder = posix.dirname(file.slice(config.adrDir.length + 1));
+    const scope = folder === "." ? "default" : folder.split("/")[0];
     if (config.scopes.length && !config.scopes.includes(scope))
-      ctx.errors.push(`${f}: scope '${scope}' is not in "scopes" of ${CONFIG_FILE} (${config.scopes.join(", ")})`);
-    const n = base.slice(0, 4);
-    if (seen.has(n)) ctx.errors.push(`${f}: number ${n} is already used by ${seen.get(n)}`);
-    seen.set(n, f);
-    const m = readFileSync(join(root, f), "utf8").replace(/\r\n/g, "\n").match(/^---\n([\s\S]*?)\n---/);
-    if (!m) {
-      ctx.errors.push(`${f}: missing YAML front matter`);
+      complain(`${file}: folder '${scope}' is not one of the "scopes" in ${CONFIG_FILE} (${config.scopes.join(", ")})`);
+    if (numbers.has(num)) complain(`${file}: ADR number ${num} is also used by ${numbers.get(num)}`);
+    numbers.set(num, file);
+
+    const block = readFileSync(join(root, file), "utf8").replace(/\r\n/g, "\n").match(/^---\n([\s\S]*?)\n---/);
+    if (!block) {
+      complain(`${file}: no front matter block found`);
       continue;
     }
-    let fm;
+    let meta;
     try {
-      fm = parseYaml(m[1]);
+      meta = parseYaml(block[1]);
     } catch (e) {
-      ctx.errors.push(`${f}: front matter is not valid: ${e.message}`);
+      complain(`${file}: front matter could not be parsed (${e.message})`);
       continue;
     }
-    if (fm?.adr !== `ADR-${n}`) ctx.errors.push(`${f}: front matter 'adr' must be ADR-${n}`);
-    ctx.protectedPaths.push(...(fm?.protected_paths ?? []));
-    for (const [key, v] of Object.entries(fm?.decisions ?? {})) {
-      const id = `${fm?.adr}.${key}`;
-      if (!/^D\d+$/.test(key) || !STATES.includes(v?.state) || !v?.title)
-        ctx.errors.push(`${f}: ${id} needs a title and a state in ${STATES.join("|")}`);
-      ctx.decisions.set(id, {
+    if (meta?.adr !== `ADR-${num}`) complain(`${file}: front matter 'adr' should read ADR-${num}`);
+    for (const [key, entry] of Object.entries(meta?.decisions ?? {})) {
+      const id = `${meta?.adr}.${key}`;
+      if (!/^D\d+$/.test(key) || !STATES.includes(entry?.state) || !entry?.title)
+        complain(`${file}: ${id} requires a title and a state, one of ${STATES.join("|")}`);
+      const decision = {
         id,
-        file: f,
-        title: String(v?.title ?? ""),
-        state: v?.state,
-        paths: v?.paths ?? [],
-        protected: v?.protected === true,
-        use_cases: v?.use_cases ?? [],
-        superseded_by: v?.superseded_by,
-        scope: String(fm?.scope ?? scope),
-      });
+        file,
+        title: String(entry?.title ?? ""),
+        state: entry?.state,
+        paths: entry?.paths ?? [],
+        protected: entry?.protected === true,
+        use_cases: entry?.use_cases ?? [],
+        superseded_by: entry?.superseded_by,
+        scope: String(meta?.scope ?? scope),
+      };
+      ctx.decisions.set(id, decision);
     }
   }
-  for (const f of files) {
-    if (!matches(config.prdPaths, f) || posix.basename(f).startsWith("_") || !f.endsWith(".md")) continue;
-    for (const m of readFileSync(join(root, f), "utf8").matchAll(/^(?:\|\s*|#+\s*)([A-Z][A-Z0-9]*-\d+)\b/gm)) ctx.useCases.add(m[1]);
+  for (const file of files) {
+    if (!matches(config.prdPaths, file) || !file.endsWith(".md") || posix.basename(file).startsWith("_")) continue;
+    for (const hit of readFileSync(join(root, file), "utf8").matchAll(/^(?:\|\s*|#+\s*)([A-Z][A-Z0-9]*-\d+)\b/gm)) ctx.useCases.add(hit[1]);
   }
   return ctx;
 }
 
-const covers = (d, p) => matches(d.paths, p);
-
-// ---- per-file checks ----------------------------------------------------
-function tagProblem(ctx, p, id) {
-  const d = ctx.decisions.get(id);
-  if (!d) return `${p}: tag ${id} does not exist`;
-  if (d.state === "superseded") return `${p}: tag ${id} is superseded${d.superseded_by ? ` by ${d.superseded_by}` : ""}`;
-  if (d.state !== "accepted") return `${p}: tag ${id} is ${d.state}, not accepted`;
-  if (!covers(d, p)) return `${p}: tag ${id} does not cover this file (its paths: ${d.paths.join(", ") || "none"})`;
+// ---- source scanning ----------------------------------------------------
+/** Why a tag cannot be honored, or undefined when it is fine. */
+function tagFault(ctx, p, id) {
+  const d = ctx.decisions.get(id) ?? null;
+  if (!d) return `${p}: @adr refers to ${id}, which no ADR defines`;
+  if (d.state === "superseded") return `${p}: ${id} was superseded${d.superseded_by ? ` by ${d.superseded_by}` : ""}; tag the replacement`;
+  if (d.state !== "accepted") return `${p}: ${id} is still '${d.state}'; only accepted decisions may be implemented`;
+  if (!coveredBy(d, p)) return `${p}: ${id} governs ${d.paths.join(", ") || "no paths"}, not this file`;
 }
 
-const EXPORT = /^export\s+(?:default\s+)?(?:async\s+)?(?:abstract\s+)?(function\*?|class|const|let|var|enum)\b\s*([A-Za-z_$][\w$]*)?/;
-const EXPORT_DEFAULT = /^export\s+default\b/;
-
-function hasAdrDoc(lines, k) {
-  let j = k - 1;
-  while (j >= 0 && lines[j].trim() === "") j--;
-  if (j < 0 || !lines[j].trim().endsWith("*/")) return false;
-  let s = j;
-  while (s > 0 && !lines[s].includes("/*")) s--;
-  const block = lines.slice(s, j + 1).join("\n");
-  return /@adr\b[^\n]*ADR-\d{4}\.D\d+/.test(block);
-}
-
-/** Returns the decision ids implemented by one governed file and records problems in ctx.errors. */
-function checkSource(ctx, p, text) {
-  const implemented = new Set();
-  let tags = 0;
-  for (const m of text.matchAll(/@adr\b([^\n]*)/g)) {
-    const ids = m[1].match(ID);
-    if (!ids) ctx.errors.push(`${p}: malformed @adr tag '${m[0].trim()}' (expected ADR-NNNN.Dn)`);
-    for (const id of ids ?? []) {
-      tags++;
-      const e = tagProblem(ctx, p, id);
-      e ? ctx.errors.push(e) : implemented.add(id);
+/** Blanks comments and string contents (keeping offsets and newlines) so exports are only found in code. */
+function maskNonCode(src) {
+  let out = "";
+  let i = 0;
+  const blankTo = (end) => {
+    out += src.slice(i, end).replace(/[^\n]/g, " ");
+    i = end;
+  };
+  while (i < src.length) {
+    const c = src[i];
+    const next = src[i + 1];
+    if (c === "/" && next === "/") {
+      const nl = src.indexOf("\n", i);
+      blankTo(nl < 0 ? src.length : nl);
+    } else if (c === "/" && next === "*") {
+      const close = src.indexOf("*/", i + 2);
+      blankTo(close < 0 ? src.length : close + 2);
+    } else if (c === '"' || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < src.length && src[j] !== c && !(c !== "`" && src[j] === "\n")) j += src[j] === "\\" ? 2 : 1;
+      blankTo(Math.min(j + 1, src.length));
+    } else {
+      out += c;
+      i++;
     }
   }
-  if (JS_FILE.test(p)) {
-    const lines = text.replace(/\r\n/g, "\n").split("\n");
-    lines.forEach((line, k) => {
-      const m = line.match(EXPORT);
-      if (!m && !EXPORT_DEFAULT.test(line)) return;
-      if (!hasAdrDoc(lines, k)) ctx.errors.push(`${p}: export '${m?.[2] ?? "default"}' has no @adr tag (no code without a decision)`);
-    });
-  } else if (!tags) ctx.errors.push(`${p}: governed file has no @adr tag (add a comment containing '@adr ADR-NNNN.Dn')`);
-  return [...implemented];
+  return out;
 }
 
-function checkProtected(ctx, p) {
-  const ok = [...ctx.decisions.values()].some((d) => d.protected && d.state === "accepted" && covers(d, p));
-  if (!ok) ctx.errors.push(`${p}: protected area with no accepted protected decision covering it. Write the ADR first`);
+const EXPORT_FORMS = new RegExp(
+  "^[ \\t]*(?:" +
+    "export\\s+(?:declare\\s+)?(?:default\\s+)?(?:async\\s+)?(?:abstract\\s+)?(function\\*?|class|const|let|var|enum|namespace)\\b\\s*([A-Za-z_$][\\w$]*)?" +
+    "|export\\s+default\\b" +
+    "|export\\s*\\*" +
+    "|export\\s*\\{(?!\\s*\\})" +
+    "|module\\.exports\\b" +
+    "|exports\\.[\\w$]+\\s*=" +
+    ")",
+  "gm",
+);
+
+/** True when the closest comment above line k is a block carrying an @adr tag (decorator lines are skipped). */
+function hasDecisionDoc(lines, k) {
+  let j = k - 1;
+  while (j >= 0 && (lines[j].trim() === "" || /^\s*@[\w.]+/.test(lines[j]))) j--;
+  if (j < 0 || !lines[j].trim().endsWith("*/")) return false;
+  let start = j;
+  while (start > 0 && !lines[start].includes("/*")) start--;
+  return /@adr\b[^\n]*ADR-\d{4}\.D\d+/.test(lines.slice(start, j + 1).join("\n"));
+}
+
+/** Checks one governed file; returns the decision ids it implements and records problems on ctx. */
+function scanSource(ctx, p, text) {
+  const implemented = new Set();
+  let tagCount = 0;
+  for (const m of text.matchAll(/@adr\b(.*)/g)) {
+    const ids = m[1].match(DECISION_ID);
+    if (!ids) ctx.problems.push(`${p}: unreadable @adr tag '${m[0].trim()}'; write ADR-NNNN.Dn`);
+    for (const id of ids || []) {
+      tagCount++;
+      const fault = tagFault(ctx, p, id);
+      if (fault) ctx.problems.push(fault);
+      else implemented.add(id);
+    }
+  }
+  if (!JS_FILE.test(p)) {
+    if (!tagCount) ctx.problems.push(`${p}: governed file carries no @adr comment; add one naming the decision it implements`);
+    return Array.from(implemented);
+  }
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const code = maskNonCode(lines.join("\n"));
+  for (const m of code.matchAll(EXPORT_FORMS)) {
+    const k = code.slice(0, m.index).split("\n").length - 1;
+    if (hasDecisionDoc(lines, k)) continue;
+    const name = m[2] ?? (m[1] ? "default" : m[0].trim().replace(/\s+/g, " "));
+    ctx.problems.push(`${p}: '${name}' is exported without an @adr tag; every governed export must name the decision it implements`);
+  }
+  return Array.from(implemented);
+}
+
+function requireProtectedDecision(ctx, p) {
+  const backed = [...ctx.decisions.values()].some((d) => d.protected && d.state === "accepted" && coveredBy(d, p));
+  if (!backed) ctx.problems.push(`${p}: lies in a protected path but no accepted decision with protected: true covers it; record that decision first`);
 }
 
 async function loadRules(ctx) {
-  const rules = [];
+  const loaded = [];
   for (const rel of ctx.config.rules) {
     try {
-      const mod = await import(pathToFileURL(resolve(ctx.root, rel)).href);
-      rules.push(mod.default);
+      loaded.push((await import(pathToFileURL(resolve(ctx.root, rel)).href)).default);
     } catch (e) {
-      ctx.errors.push(`rule module ${rel} could not be loaded: ${e.message}`);
+      ctx.problems.push(`rule module ${rel} failed to load: ${e.message}`);
     }
   }
-  return rules.filter(Boolean);
+  return loaded.filter(Boolean);
 }
 
-// ---- whole-repo analysis ------------------------------------------------
+// ---- repository-wide analysis -------------------------------------------
 export async function analyze(root, config, only) {
   const files = listFiles(root);
   const ctx = load(root, config, files);
   const implementedIn = new Map();
   const testedBy = new Map();
-  const add = (m, k, v) => m.set(k, [...new Set([...(m.get(k) ?? []), v])]);
+  const record = (map, key, file) => map.set(key, [...new Set([...(map.get(key) ?? []), file])]);
   const rules = await loadRules(ctx);
-  const ruleCtx = (extra) => ({ root, config, decisions: ctx.decisions, ...extra });
+  const forRule = (extra) => ({ root, config, decisions: ctx.decisions, ...extra });
 
   for (const p of files) {
-    if (only && p !== only) continue;
-    const text = () => readFileSync(join(root, p), "utf8");
-    if (isProtectedFile(config, p)) checkProtected(ctx, p);
+    if (only !== undefined && only !== p) continue;
+    if (isProtectedFile(config, p)) requireProtectedDecision(ctx, p);
     if (isGoverned(config, p)) {
-      const t = text();
-      for (const id of checkSource(ctx, p, t)) add(implementedIn, id, p);
-      for (const r of rules) for (const e of (await r.checkFile?.(ruleCtx({ path: p, text: t }))) ?? []) ctx.errors.push(`${p}: [${r.name ?? "rule"}] ${e}`);
+      const text = readFileSync(join(root, p), "utf8");
+      for (const id of scanSource(ctx, p, text)) record(implementedIn, id, p);
+      for (const rule of rules)
+        for (const msg of (await rule.checkFile?.(forRule({ path: p, text }))) ?? []) ctx.problems.push(`${p}: [${rule.name ?? "rule"}] ${msg}`);
     }
     if (isTest(config, p)) {
-      for (const m of text().matchAll(/\[(ADR-\d{4}\.D\d+)\]/g)) {
-        if (!ctx.decisions.has(m[1]) && !only) ctx.errors.push(`${p}: test is tagged to unknown ${m[1]}`);
-        add(testedBy, m[1], p);
+      for (const m of readFileSync(join(root, p), "utf8").matchAll(/\[(ADR-\d{4}\.D\d+)\]/g)) {
+        if (!only && !ctx.decisions.has(m[1])) ctx.problems.push(`${p}: test cites ${m[1]}, which no ADR defines`);
+        record(testedBy, m[1], p);
       }
     }
   }
   if (only) {
-    ctx.errors = ctx.errors.filter((e) => e.startsWith(`${only}:`));
-    return { ctx, implementedIn, testedBy };
+    ctx.problems = ctx.problems.filter((e) => e.startsWith(`${only}:`));
+    return { ctx, testedBy, implementedIn };
   }
 
-  for (const d of ctx.decisions.values()) {
-    if (config.requireUseCase && d.state !== "rejected" && !d.use_cases.length) ctx.errors.push(`${d.id}: needs at least one use case from a PRD`);
-    for (const u of d.use_cases) if (!ctx.useCases.has(u)) ctx.errors.push(`${d.id}: use case ${u} is not in any PRD (${config.prdPaths.join(", ")})`);
-    if (d.state === "accepted" && !d.paths.length) ctx.errors.push(`${d.id}: accepted decision needs 'paths' (the files it governs)`);
-    if (d.state === "superseded" && !(d.superseded_by && ctx.decisions.has(d.superseded_by)))
-      ctx.errors.push(`${d.id}: superseded but 'superseded_by' is missing or unknown`);
-    if (d.protected && d.state === "accepted" && implementedIn.has(d.id) && !testedBy.has(d.id))
-      ctx.errors.push(`${d.id}: protected decision is implemented but has no test titled '[${d.id}] ...'`);
+  for (const d of [...ctx.decisions.values()]) {
+    if (config.requireUseCase && d.state !== "rejected" && !d.use_cases.length) ctx.problems.push(`${d.id}: lists no use case, but at least one PRD use case is required`);
+    for (const u of d.use_cases) if (!ctx.useCases.has(u)) ctx.problems.push(`${d.id}: use case ${u} was not found in the PRD files (${config.prdPaths.join(", ")})`);
+    if (d.state === "accepted" && !d.paths.length) ctx.problems.push(`${d.id}: accepted decisions must list the 'paths' they govern`);
+    if (d.state === "superseded" && !ctx.decisions.has(d.superseded_by)) ctx.problems.push(`${d.id}: marked superseded without a valid 'superseded_by' target`);
+    if (d.state === "accepted" && d.protected && !testedBy.has(d.id) && implementedIn.has(d.id))
+      ctx.problems.push(`${d.id}: protected decision has code but no test whose title starts with [${d.id}]`);
   }
-  for (const r of rules) for (const e of (await r.checkRepo?.(ruleCtx({ files }))) ?? []) ctx.errors.push(`[${r.name ?? "rule"}] ${e}`);
-  const a = { ctx, implementedIn, testedBy };
-  const sf = join(root, config.statusFile);
-  if (!existsSync(sf) || readFileSync(sf, "utf8") !== statusText(a)) ctx.errors.push(`${config.statusFile} is missing or stale: run the 'status' command`);
-  return a;
+  for (const rule of rules) for (const msg of (await rule.checkRepo?.(forRule({ files }))) ?? []) ctx.problems.push(`[${rule.name ?? "rule"}] ${msg}`);
+  const result = { ctx, implementedIn, testedBy };
+  const statusPath = join(root, config.statusFile);
+  if (!existsSync(statusPath) || readFileSync(statusPath, "utf8") !== statusText(result))
+    ctx.problems.push(`${config.statusFile} is out of date or missing; regenerate it with the 'status' command`);
+  return result;
 }
 
-const label = (a, d) => {
-  const s = d.state[0].toUpperCase() + d.state.slice(1);
-  if (d.state !== "accepted") return s;
-  if (!a.implementedIn.has(d.id)) return `${s} · Not implemented`;
-  return `${s} · Implemented · ${a.testedBy.has(d.id) ? "Tested" : "Untested"}`;
-};
+function progress(a, d) {
+  if (d.state !== "accepted") return d.state;
+  if (!a.implementedIn.has(d.id)) return "accepted, no code yet";
+  return a.testedBy.has(d.id) ? "accepted, code and test present" : "accepted, code present, no test";
+}
 
 export const gaps = (a) =>
-  [...a.ctx.decisions.values()].filter((d) => d.state === "accepted" && !(a.implementedIn.has(d.id) && a.testedBy.has(d.id))).map((d) => `${d.id} ${label(a, d)}`);
+  [...a.ctx.decisions.values()].filter((d) => d.state === "accepted" && !(a.implementedIn.has(d.id) && a.testedBy.has(d.id))).map((d) => `${d.id} (${progress(a, d)})`);
 
 export function statusText(a) {
-  const cell = (xs) => (xs?.length ? xs.map((x) => `\`${x}\``).join("<br>") : "—");
-  const row = (d) =>
-    `| ${d.id} | ${d.title} | ${label(a, d)}${d.protected ? " · protected" : ""} | ${d.use_cases.join(", ") || "—"} | ${cell(a.implementedIn.get(d.id))} | ${cell(a.testedBy.get(d.id))} |`;
-  const decisions = [...a.ctx.decisions.values()].sort((x, y) => x.id.localeCompare(y.id, "en", { numeric: true }));
-  const scopes = [...new Set(decisions.map((d) => d.scope))].sort();
-  return [
+  const files = (xs) => (xs?.length ? xs.map((x) => `\`${x}\``).join("<br>") : "-");
+  const all = [...a.ctx.decisions.values()].sort((x, y) => x.id.localeCompare(y.id, "en", { numeric: true }));
+  const out = [
     "# Decision status",
     "",
-    "Generated by the decision-protocol `status` command. Do not edit. Implemented = code tagged `@adr`; Tested = test titled `[ADR-NNNN.Dn]`.",
-    "",
-    ...scopes.flatMap((scope) => [
-      `## ${scope}`,
-      "",
-      "| Decision | Title | State | Use cases | Implemented in | Tested by |",
-      "|---|---|---|---|---|---|",
-      ...decisions.filter((d) => d.scope === scope).map(row),
-      "",
-    ]),
-  ].join("\n");
+    "Generated file; change the ADRs or the code, then run the `status` command. Code lists files tagged `@adr`. Tests lists test files with a `[ADR-NNNN.Dn]` marker.",
+  ];
+  for (const scope of [...new Set(all.map((d) => d.scope))].sort()) {
+    out.push("", `## ${scope}`, "", "| ID | Decision | Status | Use cases | Code | Tests |", "|:--|:--|:--|:--|:--|:--|");
+    for (const d of all.filter((x) => x.scope === scope))
+      out.push(`| ${d.id} | ${d.title} | ${progress(a, d)}${d.protected ? " (protected)" : ""} | ${d.use_cases.join(", ") || "-"} | ${files(a.implementedIn.get(d.id))} | ${files(a.testedBy.get(d.id))} |`);
+  }
+  return out.join("\n") + "\n";
 }
 
 // ---- commit message -----------------------------------------------------
-export function checkCommit(ctx, raw, files, addedTestText) {
+/**
+ * `kind` carries facts verified from git, never from the message: { merge: true } for a real merge
+ * (several parents, or MERGE_HEAD present), { revert: true } for a verified revert.
+ */
+export function checkCommit(ctx, raw, files, addedTestText, kind = {}) {
   const { config } = ctx;
-  const msg = raw.split("\n").filter((l) => !l.startsWith("#")).join("\n").trim();
-  const subject = msg.split("\n")[0] ?? "";
-  if (/^(Merge|Revert) /.test(subject)) return [];
+  const text = raw.split("\n").filter((l) => !l.startsWith("#")).join("\n").trim();
+  const subject = text.split("\n")[0] ?? "";
+  if (kind.merge) return [];
+  if (kind.revert && /^Revert /.test(subject)) return [];
   if (/^(docs|chore)\(no-adr\): \S/.test(subject)) {
-    const hit = files.filter((f) => isGoverned(config, f) || isProtectedFile(config, f));
-    return hit.length ? [`(no-adr) commit touches governed code: ${hit.join(", ")}. Name a decision: type(ADR-NNNN.Dn): ...`] : [];
+    const touched = files.filter((f) => isGoverned(config, f) || isProtectedFile(config, f));
+    return touched.length ? [`a (no-adr) commit may not include governed or protected files (${touched.join(", ")}); cite a decision instead`] : [];
   }
-  const m = subject.match(/^(\w+)\(([^)]*)\): \S/);
-  if (!m || !config.commitTypes.includes(m[1]))
-    return [`subject must be 'type(ADR-NNNN.Dn): summary' (type: ${config.commitTypes.join("|")}) or 'docs|chore(no-adr): summary'; got '${subject}'`];
-  const ids = m[2].split(/\s*,\s*/);
-  const errs = [];
-  for (const id of ids) {
-    const d = ctx.decisions.get(id);
-    if (!/^ADR-\d{4}\.D\d+$/.test(id) || !d) errs.push(`${id} is not a known decision`);
-    else if (d.state !== "accepted") errs.push(`${id} is ${d.state}, not accepted`);
+  const head = subject.match(/^(\w+)\(([^)]*)\): \S/);
+  if (!head || !config.commitTypes.includes(head[1]))
+    return [`first line should look like 'type(ADR-NNNN.Dn): summary' with type one of ${config.commitTypes.join("|")}, or 'docs(no-adr): ...' / 'chore(no-adr): ...'; found '${subject}'`];
+  const cited = head[2].split(/\s*,\s*/);
+  const problems = [];
+  for (const id of cited) {
+    const d = ctx.decisions.get(id) ?? null;
+    if (!d || !/^ADR-\d{4}\.D\d+$/.test(id)) problems.push(`${id} is not a decision defined in any ADR`);
+    else if (d.state !== "accepted") problems.push(`${id} has state '${d.state}' and cannot be cited`);
   }
-  if (m[1] === "fix") {
-    for (const f of FIX_FIELDS) if (!new RegExp(`^${f}: \\S`, "im").test(msg)) errs.push(`fix needs a '${f[0].toUpperCase() + f.slice(1)}: ...' line`);
-    const exp = msg.match(/^expected: (.*)$/im)?.[1] ?? "";
-    if (!ids.some((id) => exp.includes(id))) errs.push(`'Expected:' must cite the decision (${ids.join(", ")})`);
-    if (!ids.some((id) => addedTestText.includes(`[${id}]`))) errs.push(`fix must add a test titled '[${ids[0]}] ...'`);
+  if (head[1] === "fix") {
+    for (const field of FIX_FIELDS)
+      if (!new RegExp(`^${field}: \\S`, "im").test(text)) problems.push(`fix commits need a line starting '${field[0].toUpperCase() + field.slice(1)}:'`);
+    const expected = text.match(/^expected: (.*)$/im)?.[1] ?? "";
+    if (!cited.some((id) => expected.includes(id))) problems.push(`the Expected line must quote the restored decision (${cited.join(", ")})`);
+    if (!cited.some((id) => addedTestText.includes(`[${id}]`))) problems.push(`a fix must add a test containing [${cited[0]}]`);
   }
-  return errs;
+  return problems;
 }
 
 function addedTestLines(config, diff) {
-  let cur = "";
-  const out = [];
-  for (const l of diff.split("\n")) {
-    if (l.startsWith("+++ ")) cur = l.slice(4).replace(/^b\//, "");
-    else if (l.startsWith("+") && isTest(config, cur)) out.push(l);
+  let current = "";
+  const added = [];
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+++ ")) current = line.slice(4).replace(/^b\//, "");
+    else if (line.startsWith("+") && isTest(config, current)) added.push(line);
   }
-  return out.join("\n");
+  return added.join("\n");
 }
 
 // ---- Claude gate --------------------------------------------------------
@@ -455,109 +528,135 @@ export function gate(ctx, file) {
   const p = isAbsolute(file) ? relative(root, file) : file;
   const allow = { decision: "allow", reason: "" };
   if (!p || p.startsWith("..")) return allow;
-  const ruleFile =
+  const rulesFile =
     p.startsWith(`${config.adrDir}/`) ||
     p === CONFIG_FILE ||
     p.startsWith(".decision-protocol/") ||
     p === ".github/workflows/decision-protocol.yml" ||
     config.rules.some((r) => posix.normalize(r) === p);
-  if (ruleFile) return { decision: "ask", reason: `${p} defines the decision rules. Confirm the user asked for this change.` };
+  if (rulesFile) return { decision: "ask", reason: `${p} is part of the decision rules; proceed only if the user asked for this change.` };
   if (!isProtectedFile(config, p)) return allow;
-  const deny = (why) => ({
+  const refuse = (why) => ({
     decision: "deny",
-    reason: `${p} is a protected area: ${why}. Write .claude/intent.json {"decision":"ADR-NNNN.Dn","type":"${config.commitTypes.join("|")}"[,"observed","expected","cause","impact" for fix]} naming an accepted protected decision that covers this file. If none exists, propose an ADR and stop.`,
+    reason: `${p} is in a protected path (${why}). Create .claude/intent.json with {"decision": "ADR-NNNN.Dn", "type": "${config.commitTypes.join("|")}"} (plus observed, expected, cause, impact for a fix) naming an accepted protected decision that covers this file; if there is none, propose an ADR and stop.`,
   });
-  const f = join(root, ".claude/intent.json");
-  if (!existsSync(f)) return deny("no .claude/intent.json");
-  let i;
+  const intentFile = join(root, ".claude/intent.json");
+  if (!existsSync(intentFile)) return refuse("no .claude/intent.json found");
+  let intent;
   try {
-    i = JSON.parse(readFileSync(f, "utf8"));
+    intent = JSON.parse(readFileSync(intentFile, "utf8"));
   } catch {
-    return deny("intent.json is not valid JSON");
+    return refuse("intent.json cannot be parsed as JSON");
   }
-  const d = ctx.decisions.get(i?.decision);
-  if (!d || d.state !== "accepted" || !d.protected) return deny(`'${i?.decision}' is not an accepted protected decision`);
-  if (!covers(d, p)) return deny(`${d.id} does not cover this file`);
-  if (!config.commitTypes.includes(i.type)) return deny(`type must be one of ${config.commitTypes.join(", ")}`);
-  if (i.type === "fix") {
-    const missing = FIX_FIELDS.filter((k) => !String(i[k] ?? "").trim());
-    if (missing.length) return deny(`fix intent is missing ${missing.join(", ")}`);
+  const d = ctx.decisions.get(intent?.decision);
+  if (!d || d.state !== "accepted" || !d.protected) return refuse(`${intent?.decision} is not an accepted protected decision`);
+  if (!coveredBy(d, p)) return refuse(`${d.id} does not govern this file`);
+  if (!config.commitTypes.includes(intent.type)) return refuse(`type must be one of ${config.commitTypes.join(", ")}`);
+  if (intent.type === "fix") {
+    const lacking = FIX_FIELDS.filter((k) => !String(intent[k] ?? "").trim());
+    if (lacking.length) return refuse(`a fix intent also needs ${lacking.join(", ")}`);
   }
   return allow;
 }
 
-// ---- env file guard -----------------------------------------------------
+// ---- environment file guard ---------------------------------------------
 export function envFiles(paths) {
-  return paths.filter((f) => {
-    const b = posix.basename(f);
-    return /^\.env(\..+)?$/.test(b) && !ENV_ALLOWED.test(b);
-  });
+  return paths.filter((f) => /^\.env(\..+)?$/.test(posix.basename(f)) && !ENV_ALLOWED.test(posix.basename(f)));
 }
 
-// ---- CLI ----------------------------------------------------------------
-function fail(errs, code = 1) {
-  if (!errs.length) return;
-  for (const e of errs) console.error(`decision-protocol: ${e}`);
-  process.exit(code);
+// ---- command line -------------------------------------------------------
+const COMMANDS = ["check", "status", "commit-msg", "gate", "run-tests", "guard-env"];
+
+function die(messages, code = 1) {
+  if (!messages.length) return;
+  for (const m of messages) console.error(`decision-protocol: ${m}`);
+  process.exit(Number(code));
 }
-const git = (root, ...a) => spawnSync("git", a, { cwd: root, encoding: "utf8" }).stdout ?? "";
+
+const gitOut = (root, ...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" }).stdout ?? "";
+const gitOk = (root, ...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" }).status === 0;
+const NO_RENAMES = ["--no-renames", "--no-color", "--no-ext-diff"];
+
+/** Facts about the commit being checked, taken from git rather than from the message. */
+function commitFacts(root, message, sha) {
+  let merge;
+  let pendingRevert = false;
+  let files;
+  let diff;
+  if (sha) {
+    merge = gitOut(root, "rev-list", "--parents", "-n", "1", sha).trim().split(/\s+/).length > 2;
+    files = gitOut(root, "diff-tree", "--no-commit-id", "--name-only", "-r", ...NO_RENAMES, sha);
+    diff = gitOut(root, "show", "-U0", "--format=", ...NO_RENAMES, sha);
+  } else {
+    const gitDir = resolve(root, gitOut(root, "rev-parse", "--git-dir").trim() || ".git");
+    merge = existsSync(join(gitDir, "MERGE_HEAD"));
+    pendingRevert = existsSync(join(gitDir, "REVERT_HEAD"));
+    files = gitOut(root, "diff", "--cached", "--name-only", ...NO_RENAMES);
+    diff = gitOut(root, "diff", "--cached", "-U0", ...NO_RENAMES);
+  }
+  const named = message.match(/^This reverts commit ([0-9a-f]{7,40})\b/m)?.[1];
+  const revert = pendingRevert || Boolean(named && gitOk(root, "cat-file", "-e", `${named}^{commit}`));
+  return { kind: { merge, revert }, files: files.split("\n").filter(Boolean), diff };
+}
 
 async function main() {
   const argv = process.argv.slice(2);
   let root;
-  const ri = argv.indexOf("--root");
-  if (ri >= 0) root = resolve(argv.splice(ri, 2)[1]);
+  const flag = argv.indexOf("--root");
+  if (flag >= 0) root = resolve(argv.splice(flag, 2)[1]);
   const [cmd, arg] = argv;
   if (cmd === "version") return console.log(VERSION);
-  root ??= (spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).stdout || "").trim() || process.cwd();
-  if (!cmd || !["check", "status", "commit-msg", "gate", "run-tests", "guard-env"].includes(cmd))
-    fail(["usage: dp.mjs check [--stdin] | status | commit-msg <file> [--commit <sha>] | gate | run-tests | guard-env | version"], 64);
+  if (!COMMANDS.includes(cmd)) die([`usage: dp.mjs ${COMMANDS.join(" | ")} | version   (commit-msg <file> [--commit <sha>], check [--stdin])`], 64);
+  root ??= gitOut(process.cwd(), "rev-parse", "--show-toplevel").trim() || process.cwd();
 
   let config;
   try {
     config = loadConfig(root);
   } catch (e) {
-    return fail([`${CONFIG_FILE} is not valid JSON: ${e.message}`]);
+    return die([`${CONFIG_FILE} is invalid: ${e.message}`]);
   }
-  if (!config) return fail([`${CONFIG_FILE} not found in ${root}. Run the 'init' skill first.`]);
+  if (!config) return die([`${CONFIG_FILE} is missing in ${root}; run the 'init' skill first`]);
 
-  if (cmd === "guard-env") {
-    const bad = envFiles(git(root, "diff", "--cached", "--name-only", "--diff-filter=ACMR").split("\n").filter(Boolean));
-    fail(bad.map((f) => `${f} is an environment file and may hold secrets. Unstage it with 'git restore --staged ${f}' and add it to .gitignore (only .env.example style templates may be committed)`));
-  } else if (cmd === "run-tests") {
-    if (!config.testCommand.trim()) return console.log(`decision-protocol: no "testCommand" in ${CONFIG_FILE}; skipping tests`);
-    const r = spawnSync(config.testCommand, { cwd: root, shell: true, stdio: "inherit" });
-    process.exit(r.status ?? 1);
-  } else if (cmd === "status") {
-    const a = await analyze(root, config);
-    const f = join(root, config.statusFile);
-    mkdirSync(dirname(f), { recursive: true });
-    writeFileSync(f, statusText(a));
-    console.log(`${config.statusFile} updated`);
-  } else if (cmd === "check") {
-    if (arg === "--stdin") {
-      const file = JSON.parse(readFileSync(0, "utf8") || "{}")?.tool_input?.file_path ?? "";
-      const p = file ? relative(root, resolve(root, file)) : "";
-      if (!p || p.startsWith("..") || !(isGoverned(config, p) || isProtectedFile(config, p))) process.exit(0);
-      fail((await analyze(root, config, p)).ctx.errors, 2);
-      return;
+  switch (cmd) {
+    case "guard-env": {
+      const staged = gitOut(root, "diff", "--cached", "--name-only", "--diff-filter=ACMR", ...NO_RENAMES).split("\n").filter(Boolean);
+      return die(envFiles(staged).map((f) => `${f} looks like an environment file that may hold secrets and cannot be committed. Unstage it ('git restore --staged ${f}') and ignore it; templates such as .env.example are fine`));
     }
-    const a = await analyze(root, config);
-    for (const g of gaps(a)) console.log(`gap: ${g}`);
-    fail(a.ctx.errors);
-    console.log("decision-protocol check passed");
-  } else if (cmd === "commit-msg") {
-    const sha = argv[2] === "--commit" ? argv[3] : undefined;
-    const files = (sha ? git(root, "diff-tree", "--no-commit-id", "--name-only", "-r", sha) : git(root, "diff", "--cached", "--name-only")).split("\n").filter(Boolean);
-    const diff = sha ? git(root, "show", sha, "-U0", "--format=", "--no-color") : git(root, "diff", "--cached", "-U0", "--no-color");
-    const ctx = load(root, config);
-    fail(checkCommit(ctx, readFileSync(arg, "utf8"), files, addedTestLines(config, diff)));
-  } else if (cmd === "gate") {
-    const input = JSON.parse(readFileSync(0, "utf8") || "{}");
-    const v = gate(load(root, config), input?.tool_input?.file_path ?? "");
-    if (v.decision === "deny") fail([v.reason], 2);
-    if (v.decision === "ask")
-      console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: v.reason } }));
+    case "run-tests": {
+      if (!config.testCommand.trim()) return console.log(`decision-protocol: ${CONFIG_FILE} has no "testCommand"; skipping tests`);
+      return process.exit(spawnSync(config.testCommand, { cwd: root, shell: true, stdio: "inherit" }).status ?? 1);
+    }
+    case "status": {
+      const a = await analyze(root, config);
+      writeInside(root, config.statusFile, statusText(a));
+      return console.log(`${config.statusFile} written`);
+    }
+    case "check": {
+      if (argv.includes("--stdin")) {
+        const target = JSON.parse(readFileSync(0, "utf8") || "{}")?.tool_input?.file_path ?? "";
+        const p = target ? relative(root, resolve(root, target)) : "";
+        if (!p || p.startsWith("..") || !(isGoverned(config, p) || isProtectedFile(config, p))) return;
+        const one = await analyze(root, config, p);
+        return die(one.ctx.problems, 2);
+      }
+      const a = await analyze(root, config);
+      for (const g of gaps(a)) console.log(`open: ${g}`);
+      if (a.ctx.problems.length) return die(a.ctx.problems);
+      return console.log("decision-protocol: all checks passed");
+    }
+    case "commit-msg": {
+      const sha = argv[2] === "--commit" ? argv[3] : undefined;
+      const message = readFileSync(arg, "utf8");
+      const facts = commitFacts(root, message, sha);
+      return die(checkCommit(load(root, config), message, facts.files, addedTestLines(config, facts.diff), facts.kind));
+    }
+    case "gate": {
+      const input = JSON.parse(readFileSync(0, "utf8") || "{}");
+      const verdict = gate(load(root, config), input?.tool_input?.file_path ?? "");
+      if (verdict.decision === "deny") return die([verdict.reason], 2);
+      if (verdict.decision === "ask")
+        console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: verdict.reason } }));
+    }
   }
 }
 
