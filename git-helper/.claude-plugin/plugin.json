@@ -1,9 +1,0 @@
-{
-    "name": "git-helper",
-    "version": "1.0.0",
-    "description": "Some useful git commands helper.",
-    "author": {
-        "name": "Juni Yadi",
-        "email": "me@juniyadi.id"
-    }
-}
