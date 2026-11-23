@@ -6,6 +6,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { safeRelPath } from "./dp.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const plugin = resolve(here, "..");
@@ -23,9 +24,17 @@ const read = (rel) => readFileSync(join(plugin, rel), "utf8");
 const stamped = read("scripts/dp.mjs").replace("__DP_VERSION__", version);
 
 let adrDir = "docs/adr";
+let configured;
 try {
-  adrDir = JSON.parse(readFileSync(join(target, "decision-protocol.config.json"), "utf8")).adrDir ?? adrDir;
+  configured = JSON.parse(readFileSync(join(target, "decision-protocol.config.json"), "utf8"));
 } catch {}
+try {
+  adrDir = safeRelPath("adrDir", configured?.adrDir ?? adrDir);
+  safeRelPath("statusFile", configured?.statusFile ?? `${adrDir}/STATUS.md`);
+} catch (e) {
+  console.error(`decision-protocol.config.json: ${e.message}`);
+  process.exit(65);
+}
 const prdDir = "docs/prd";
 
 const files = [
