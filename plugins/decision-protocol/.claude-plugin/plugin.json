@@ -1,0 +1,9 @@
+{
+  "name": "decision-protocol",
+  "version": "1.0.0",
+  "description": "Decisions are the source of truth: PRD use case, then ADR decision, then code tagged with the decision it implements. Includes a checker, git hooks, CI template and two skills.",
+  "author": { "name": "JuniYadi" },
+  "repository": "https://github.com/JuniYadi/claude-code",
+  "license": "MIT",
+  "keywords": ["adr", "decisions", "governance", "git-hooks", "workflow"]
+}
