@@ -30,7 +30,7 @@ function repo(files, config = CONFIG) {
 }
 const errorsOf = async (root) => {
   const c = loadConfig(root);
-  return (await analyze(root, c)).ctx.errors.filter((e) => !e.includes("stale"));
+  return (await analyze(root, c)).ctx.problems.filter((e) => !e.includes("out of date"));
 };
 
 test("globs", () => {
@@ -50,21 +50,21 @@ test("yaml subset", () => {
 
 test("orphan export fails, tagged accepted export passes", async () => {
   let r = repo({ "src/billing/a.ts": "export function pay() {}\n" });
-  assert.match((await errorsOf(r)).join("\n"), /export 'pay' has no @adr tag/);
+  assert.match((await errorsOf(r)).join("\n"), /'pay' is exported without an @adr tag/);
   r = repo({ "src/billing/a.ts": "/** @adr ADR-0001.D1 */\nexport function pay() {}\nexport type T = string;\n" });
   assert.deepEqual(await errorsOf(r), []);
 });
 
 test("proposed, unknown and uncovered tags fail", async () => {
   const src = (id) => ({ "src/billing/a.ts": `/** @adr ${id} */\nexport const x = 1;\n` });
-  assert.match((await errorsOf(repo({ ...src("ADR-0001.D1"), "docs/adr/billing/0001-x.md": ADR("proposed") }))).join(), /is proposed, not accepted/);
-  assert.match((await errorsOf(repo(src("ADR-0001.D9")))).join(), /does not exist/);
-  assert.match((await errorsOf(repo({ "src/other/a.ts": "/** @adr ADR-0001.D1 */\nexport const x = 1;\n" }))).join(), /does not cover/);
+  assert.match((await errorsOf(repo({ ...src("ADR-0001.D1"), "docs/adr/billing/0001-x.md": ADR("proposed") }))).join(), /is still 'proposed'/);
+  assert.match((await errorsOf(repo(src("ADR-0001.D9")))).join(), /no ADR defines/);
+  assert.match((await errorsOf(repo({ "src/other/a.ts": "/** @adr ADR-0001.D1 */\nexport const x = 1;\n" }))).join(), /not this file/);
 });
 
 test("non-JS governed file needs a file-level tag", async () => {
   const cfg = { ...CONFIG, governed: ["src/**/*.py"] };
-  assert.match((await errorsOf(repo({ "src/billing/a.py": "def f(): pass\n" }, cfg))).join(), /no @adr tag/);
+  assert.match((await errorsOf(repo({ "src/billing/a.py": "def f(): pass\n" }, cfg))).join(), /carries no @adr comment/);
   assert.deepEqual(await errorsOf(repo({ "src/billing/a.py": "# @adr ADR-0001.D1\ndef f(): pass\n" }, cfg)), []);
 });
 
@@ -76,32 +76,32 @@ test("exempt paths and tests are not governed", () => {
 });
 
 test("use cases must exist in a PRD; protected area needs a protected decision", async () => {
-  assert.match((await errorsOf(repo({ "docs/prd/billing.md": "nothing\n" }))).join(), /use case BIL-1 is not in any PRD/);
+  assert.match((await errorsOf(repo({ "docs/prd/billing.md": "nothing\n" }))).join(), /use case BIL-1 was not found/);
   const unprotected = ADR().replace("protected: true", "protected: false");
-  assert.match((await errorsOf(repo({ "src/auth/s.ts": "/** @adr ADR-0001.D2 */\nexport const s = 1;\n", "docs/adr/billing/0001-x.md": unprotected }))).join(), /protected area with no accepted protected decision/);
+  assert.match((await errorsOf(repo({ "src/auth/s.ts": "/** @adr ADR-0001.D2 */\nexport const s = 1;\n", "docs/adr/billing/0001-x.md": unprotected }))).join(), /no accepted decision with protected: true/);
 });
 
 test("protected decision implemented without test fails; with test passes", async () => {
   const code = { "src/auth/s.ts": "/** @adr ADR-0001.D2 */\nexport const s = 1;\n" };
-  assert.match((await errorsOf(repo(code))).join(), /no test titled '\[ADR-0001.D2\]/);
+  assert.match((await errorsOf(repo(code))).join(), /no test whose title starts with \[ADR-0001.D2\]/);
   assert.deepEqual(await errorsOf(repo({ ...code, "src/auth/s.test.ts": "test('[ADR-0001.D2] s', () => {})\n" })), []);
 });
 
 test("status is generated and staleness is reported", async () => {
   const r = repo({});
   const a = await analyze(r, loadConfig(r));
-  assert.ok(a.ctx.errors.some((e) => e.includes("stale")));
-  assert.match(statusText(a), /ADR-0001\.D1 \| Invoices \| Accepted · Not implemented/);
+  assert.ok(a.ctx.problems.some((e) => e.includes("out of date")));
+  assert.match(statusText(a), /ADR-0001\.D1 \| Invoices \| accepted, no code yet/);
 });
 
 test("commit messages", () => {
   const r = repo({});
   const ctx = load(r, loadConfig(r));
   assert.deepEqual(checkCommit(ctx, "feat(ADR-0001.D1): add pay", [], ""), []);
-  assert.match(checkCommit(ctx, "added pay", [], "")[0], /subject must be/);
-  assert.match(checkCommit(ctx, "feat(ADR-0001.D7): x", [], "")[0], /not a known decision/);
+  assert.match(checkCommit(ctx, "added pay", [], "")[0], /first line should look like/);
+  assert.match(checkCommit(ctx, "feat(ADR-0001.D7): x", [], "")[0], /not a decision defined/);
   assert.deepEqual(checkCommit(ctx, "docs(no-adr): notes", ["README.md"], ""), []);
-  assert.match(checkCommit(ctx, "chore(no-adr): x", ["src/billing/a.ts"], "")[0], /touches governed code/);
+  assert.match(checkCommit(ctx, "chore(no-adr): x", ["src/billing/a.ts"], "")[0], /may not include governed/);
   const fix = "fix(ADR-0001.D1): rounding\n\nObserved: a\nExpected: per ADR-0001.D1, b\nCause: c\nImpact: d\n";
   assert.match(checkCommit(ctx, fix, [], "").join(), /must add a test/);
   assert.deepEqual(checkCommit(ctx, fix, [], "+test('[ADR-0001.D1] rounds')"), []);
