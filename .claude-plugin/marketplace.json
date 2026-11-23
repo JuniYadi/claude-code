@@ -1,44 +1,13 @@
 {
-  "name": "development",
-  "owner": {
-    "name": "Juni Yadi",
-    "email": "me@juniyadi.id"
-  },
-  "metadata": {
-    "description": "Claude Code plugins for Development"
-  },
+  "name": "claude-code-plugins",
+  "owner": { "name": "JuniYadi" },
+  "metadata": { "description": "Claude Code plugins for development workflows" },
   "plugins": [
     {
-      "name": "issue-reviews",
-      "source": "./issue-reviews",
-      "description": "Analyze and review GitHub issues to provide insights and suggestions for improvement.",
+      "name": "decision-protocol",
+      "source": "./plugins/decision-protocol",
+      "description": "PRD use case, then ADR decision, then tagged code. Checker, git hooks, CI template and skills.",
       "version": "1.0.0",
-      "author": {
-        "name": "Juni Yadi",
-        "email": "me@juniyadi.id"
-      },
-      "category": "productivity"
-    },
-    {
-      "name": "git-helper",
-      "source": "./git-helper",
-      "description": "Some useful git commands helper.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Juni Yadi",
-        "email": "me@juniyadi.id"
-      },
-      "category": "productivity"
-    },
-    {
-      "name": "super-dev",
-      "source": "./super-dev",
-      "description": "Create new feature with 5 judge criteria with different personality.",
-      "version": "1.4.0",
-      "author": {
-        "name": "Juni Yadi",
-        "email": "me@juniyadi.id"
-      },
       "category": "productivity"
     }
   ]
