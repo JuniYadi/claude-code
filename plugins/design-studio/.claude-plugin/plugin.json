@@ -1,0 +1,9 @@
+{
+  "name": "design-studio",
+  "version": "1.0.0",
+  "description": "Local offline HTML design canvas with live CSS tokens, SVG flow connectors, interactive Play mode, and JSON/bundle import-export. Driven via DESIGN.md and self-contained HTML frames.",
+  "author": { "name": "JuniYadi" },
+  "repository": "https://github.com/JuniYadi/claude-code",
+  "license": "MIT",
+  "keywords": ["design", "prototyping", "canvas", "html", "tokens", "figma", "offline"]
+}

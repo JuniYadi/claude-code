@@ -1,0 +1,76 @@
+{
+  "project": "Northstar Cloud — Auth & Console Flow",
+  "entry": "auth-login",
+  "frames": [
+    {
+      "id": "auth-login",
+      "title": "Sign In",
+      "file": "frames/auth-login.html",
+      "group": "auth",
+      "viewport": { "width": 1280, "height": 800 },
+      "position": { "x": 80, "y": 140 },
+      "status": "review",
+      "links": [
+        { "to": "ops-dashboard", "label": "Sign in / SSO" },
+        { "to": "auth-signup", "label": "Create account" },
+        { "to": "auth-reset-password", "label": "Forgot password" }
+      ],
+      "notes": "Flow entry: SSO, passkey, or email login → Dashboard; links to Sign Up & Reset Password"
+    },
+    {
+      "id": "auth-signup",
+      "title": "Create Account",
+      "file": "frames/auth-signup.html",
+      "group": "auth",
+      "viewport": { "width": 1280, "height": 800 },
+      "position": { "x": 80, "y": 1140 },
+      "status": "draft",
+      "links": [
+        { "to": "ops-dashboard", "label": "Create workspace" },
+        { "to": "auth-login", "label": "Sign in" }
+      ],
+      "notes": "Workspace provisioning with region picker & password strength meter"
+    },
+    {
+      "id": "auth-reset-password",
+      "title": "Reset Password",
+      "file": "frames/auth-reset-password.html",
+      "group": "auth",
+      "viewport": { "width": 960, "height": 720 },
+      "position": { "x": 1620, "y": 1180 },
+      "status": "draft",
+      "links": [
+        { "to": "auth-login", "label": "Return to Sign In" },
+        { "to": "auth-signup", "label": "Create account" }
+      ],
+      "notes": "Submit form to reveal inline recovery link confirmation, then return to Sign In"
+    },
+    {
+      "id": "ops-dashboard",
+      "title": "Deployment Console — Desktop",
+      "file": "frames/ops-dashboard.html",
+      "group": "console",
+      "viewport": { "width": 1440, "height": 900 },
+      "position": { "x": 1620, "y": 100 },
+      "status": "review",
+      "links": [
+        { "to": "auth-login", "label": "Sign out" },
+        { "to": "ops-mobile", "label": "Mobile companion" }
+      ],
+      "notes": "Post-login destination: interactive release filters + Sign out back to Sign In"
+    },
+    {
+      "id": "ops-mobile",
+      "title": "Deployment Console — Mobile",
+      "file": "frames/ops-mobile.html",
+      "group": "console",
+      "viewport": { "width": 390, "height": 844 },
+      "position": { "x": 3280, "y": 130 },
+      "status": "draft",
+      "links": [
+        { "to": "ops-dashboard", "label": "Desktop console" }
+      ],
+      "notes": "Mobile incident triage companion sharing identical CSS tokens"
+    }
+  ]
+}

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — Northstar Cloud</title>
+  <link rel="stylesheet" href="../tokens.css" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--color-bg);
+      color: var(--color-fg);
+      font-family: var(--font-sans);
+      font-size: var(--body-size);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      min-height: 100vh;
+    }
+
+    /* Left editorial / telemetry panel */
+    .brand-pane {
+      background: var(--color-surface);
+      border-right: 1px solid var(--color-border);
+      padding: 40px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: var(--color-accent);
+      color: var(--color-accent-fg);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .hero-block { max-width: 480px; }
+    .kicker {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-fg-muted);
+      margin-bottom: 14px;
+    }
+    .headline {
+      margin: 0 0 16px 0;
+      font-family: var(--font-display);
+      font-size: 46px;
+      font-weight: 400;
+      line-height: 1.08;
+      letter-spacing: -0.015em;
+    }
+    .subcopy {
+      margin: 0;
+      color: var(--color-fg-muted);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .proof-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding-top: 24px;
+      border-top: 1px solid var(--color-border);
+    }
+    .proof-val {
+      font-size: 20px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
+    }
+    .proof-lbl {
+      font-size: 12px;
+      color: var(--color-fg-muted);
+      margin-top: 2px;
+    }
+
+    /* Right auth form */
+    .form-pane {
+      display: grid;
+      place-items: center;
+      padding: 40px 32px;
+    }
+    .card {
+      width: 100%;
+      max-width: 396px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .card-head h1 {
+      margin: 0 0 6px 0;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .card-head p {
+      margin: 0;
+      color: var(--color-fg-muted);
+      font-size: 14px;
+    }
+
+    .sso-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .btn {
+      height: 40px;
+      padding: 0 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-fg);
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background var(--motion-fast), border-color var(--motion-fast);
+    }
+    .btn:hover { background: var(--color-surface-elevated); border-color: #394052; }
+    .btn-primary {
+      width: 100%;
+      height: 42px;
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-accent-fg);
+      font-weight: 600;
+    }
+    .btn-primary:hover { filter: brightness(1.08); background: var(--color-accent); border-color: var(--color-accent); }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--color-fg-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-fg);
+    }
+    .link {
+      color: var(--color-accent);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .link:hover { text-decoration: underline; }
+
+    input[type="email"], input[type="password"] {
+      height: 40px;
+      padding: 0 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-fg);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color var(--motion-fast);
+    }
+    input:focus { border-color: var(--color-accent); }
+
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--color-fg-muted);
+      cursor: pointer;
+    }
+    .remember input { accent-color: var(--color-accent); }
+
+    .foot-note {
+      text-align: center;
+      font-size: 13.5px;
+      color: var(--color-fg-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="brand-pane">
+      <div class="brand-row">
+        <span class="mark">N</span>
+        <span>Northstar Cloud</span>
+      </div>
+
+      <div class="hero-block">
+        <div class="kicker">Cluster SG-04 · Operations Portal</div>
+        <h2 class="headline">Ship every release with clear rollback rails.</h2>
+        <p class="subcopy">Inspect live canary telemetry, approve staged traffic shifts, and trace edge latency from one console.</p>
+      </div>
+
+      <div class="proof-strip">
+        <div>
+          <div class="proof-val">99.984%</div>
+          <div class="proof-lbl">30d availability</div>
+        </div>
+        <div>
+          <div class="proof-val">38.4 ms</div>
+          <div class="proof-lbl">Global edge p95</div>
+        </div>
+        <div>
+          <div class="proof-val">18 POPs</div>
+          <div class="proof-lbl">Active regions</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="form-pane">
+      <div class="card">
+        <div class="card-head">
+          <h1>Sign in to Northstar</h1>
+          <p>Use your workspace email or SSO provider to continue.</p>
+        </div>
+
+        <div class="sso-row">
+          <button type="button" class="btn" data-goto="ops-dashboard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            GitHub SSO
+          </button>
+          <button type="button" class="btn" data-goto="ops-dashboard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Passkey
+          </button>
+        </div>
+
+        <div class="divider">or email</div>
+
+        <form data-goto="ops-dashboard">
+          <div class="field">
+            <label for="email">Work email</label>
+            <input id="email" type="email" value="alex@northstar.dev" required />
+          </div>
+
+          <div class="field">
+            <div class="field-head">
+              <label for="password">Password</label>
+              <a href="#" class="link" data-goto="auth-reset-password">Forgot password?</a>
+            </div>
+            <input id="password" type="password" value="••••••••••••" required />
+          </div>
+
+          <label class="remember">
+            <input type="checkbox" checked />
+            <span>Keep session active for 14 days on this device</span>
+          </label>
+
+          <button type="submit" class="btn btn-primary" data-goto="ops-dashboard">Sign in to Console →</button>
+        </form>
+
+        <div class="foot-note">
+          New to Northstar? <a href="#" class="link" data-goto="auth-signup">Create an account</a>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Design Studio</title>
+  <style>
+    :root {
+      --ui-bg: #0c0d10;
+      --ui-canvas: #111318;
+      --ui-surface: #171920;
+      --ui-surface-2: #1f222c;
+      --ui-border: #2a2e3b;
+      --ui-fg: #eef0f6;
+      --ui-muted: #8b93a6;
+      --ui-accent: #3b82f6;
+      --ui-accent-soft: rgba(59, 130, 246, 0.16);
+      --ui-dot: rgba(255, 255, 255, 0.065);
+      --ui-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --ui-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --topbar-h: 50px;
+      --drawer-w: 310px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--ui-bg);
+      color: var(--ui-fg);
+      font-family: var(--ui-font);
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, select, input {
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    /* Top bar */
+    .topbar {
+      height: var(--topbar-h);
+      background: var(--ui-surface);
+      border-bottom: 1px solid var(--ui-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      gap: 12px;
+      position: relative;
+      z-index: 20;
+      user-select: none;
+    }
+    .topbar-left, .topbar-center, .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .brand-mark {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: var(--ui-accent);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge {
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--ui-surface-2);
+      border: 1px solid var(--ui-border);
+      color: var(--ui-muted);
+    }
+
+    .pills {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .pills::-webkit-scrollbar { display: none; }
+
+    .btn {
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 6px;
+      border: 1px solid var(--ui-border);
+      background: var(--ui-surface-2);
+      color: var(--ui-fg);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: background 120ms, border-color 120ms, color 120ms;
+    }
+    .btn:hover { background: #262a36; border-color: #3a4052; }
+    .btn:disabled { opacity: 0.42; cursor: not-allowed; }
+    .btn.active {
+      background: var(--ui-accent-soft);
+      border-color: var(--ui-accent);
+      color: #93c5fd;
+    }
+    .btn-primary {
+      background: var(--ui-accent);
+      border-color: var(--ui-accent);
+      color: #fff;
+      font-weight: 500;
+    }
+    .btn-primary:hover { background: #2563eb; border-color: #2563eb; }
+    .btn-ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--ui-muted);
+    }
+    .btn-ghost:hover { background: var(--ui-surface-2); color: var(--ui-fg); border-color: transparent; }
+
+    .seg {
+      display: inline-flex;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+      border-radius: 7px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .seg .btn {
+      height: 22px;
+      border: none;
+      background: transparent;
+      color: var(--ui-muted);
+      padding: 0 8px;
+      font-size: 12px;
+    }
+    .seg .btn.active {
+      background: var(--ui-surface-2);
+      color: var(--ui-fg);
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.22);
+    }
+    .live-dot.paused { background: var(--ui-muted); box-shadow: none; }
+
+    /* Workspace layout */
+    .workspace {
+      display: flex;
+      width: 100%;
+      height: calc(100% - var(--topbar-h));
+      position: relative;
+    }
+
+    /* Viewport area */
+    .stage-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background-color: var(--ui-canvas);
+      background-image: radial-gradient(var(--ui-dot) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .stage-wrap.grid-mode {
+      overflow: auto;
+      padding: 28px;
+    }
+    .stage-wrap.panning { cursor: grabbing; }
+    .stage-wrap.space-ready { cursor: grab; }
+
+    .canvas-plane {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 96px;
+      padding: 72px;
+      will-change: transform;
+    }
+    .canvas-plane.positioned {
+      display: block;
+      padding: 0;
+      width: 1px;
+      height: 1px;
+    }
+    .stage-wrap.grid-mode .canvas-plane {
+      position: static;
+      transform: none !important;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+      gap: 28px;
+      padding: 0;
+      width: auto;
+      height: auto;
+      align-items: start;
+    }
+
+    /* Flow SVG connectors overlay */
+    .flow-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 6;
+    }
+    .stage-wrap.grid-mode .flow-svg,
+    .stage-wrap.hide-flows .flow-svg {
+      display: none;
+    }
+    .flow-path {
+      fill: none;
+      stroke: rgba(96, 165, 250, 0.65);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+    }
+    .flow-path.back {
+      stroke: rgba(148, 163, 184, 0.5);
+      stroke-dasharray: 6 5;
+      stroke-width: 2;
+    }
+    .flow-label-bg {
+      fill: #141720;
+      stroke: rgba(96, 165, 250, 0.5);
+      stroke-width: 1;
+    }
+    .flow-label-bg.back {
+      stroke: rgba(148, 163, 184, 0.4);
+    }
+    .flow-label-text {
+      fill: #dbeafe;
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .flow-label-text.back { fill: #94a3b8; }
+
+    /* Artboard frame */
+    .artboard {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+    }
+    .canvas-plane.positioned .artboard {
+      position: absolute;
+    }
+    .stage-wrap.grid-mode .artboard {
+      position: static !important;
+      left: auto !important;
+      top: auto !important;
+    }
+
+    .artboard-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 2px;
+      user-select: none;
+    }
+    .artboard-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .artboard-title {
+      font-weight: 600;
+      color: var(--ui-fg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .status-pill {
+      font-family: var(--ui-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--ui-border);
+      color: var(--ui-muted);
+    }
+    .status-pill.draft { color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); background: rgba(251, 191, 36, 0.08); }
+    .status-pill.review { color: #60a5fa; border-color: rgba(96, 165, 250, 0.35); background: rgba(96, 165, 250, 0.08); }
+    .status-pill.approved { color: #4ade80; border-color: rgba(74, 222, 128, 0.35); background: rgba(74, 222, 128, 0.08); }
+
+    .link-count {
+      font-family: var(--ui-mono);
+      font-size: 10px;
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.32);
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+
+    .artboard-tools {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .vp-select {
+      height: 24px;
+      background: var(--ui-surface);
+      border: 1px solid var(--ui-border);
+      border-radius: 5px;
+      padding: 0 6px;
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      color: var(--ui-muted);
+      cursor: pointer;
+    }
+    .artboard-tools .btn {
+      height: 24px;
+      padding: 0 7px;
+      font-size: 11px;
+    }
+
+    .frame-shell {
+      position: relative;
+      background: #0b0c0e;
+      border: 1px solid var(--ui-border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      transition: border-color 180ms, box-shadow 180ms;
+    }
+    .frame-shell:hover { border-color: #3f4659; }
+    .artboard.focused .frame-shell {
+      border-color: var(--ui-accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35), 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+    .frame-shell iframe {
+      display: block;
+      border: 0;
+      background: #0b0c0e;
+      transform-origin: 0 0;
+    }
+    .stage-wrap.panning .frame-shell iframe,
+    .stage-wrap.space-ready .frame-shell iframe {
+      pointer-events: none;
+    }
+
+    .artboard-notes {
+      font-size: 12px;
+      color: var(--ui-muted);
+      padding: 0 2px;
+      max-width: 100%;
+    }
+
+    /* Tokens drawer */
+    .drawer {
+      width: var(--drawer-w);
+      background: var(--ui-surface);
+      border-left: 1px solid var(--ui-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      z-index: 15;
+    }
+    .drawer.hidden { display: none; }
+    .drawer.wide { width: 420px; }
+    .drawer-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--ui-border);
+      background: var(--ui-bg);
+      padding: 4px;
+      gap: 4px;
+    }
+    .drawer-tab {
+      height: 28px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ui-muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .drawer-tab:hover { color: var(--ui-fg); }
+    .drawer-tab.active {
+      background: var(--ui-surface-2);
+      border-color: var(--ui-border);
+      color: var(--ui-fg);
+    }
+    .drawer-pane {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    .drawer-pane.active { display: flex; }
+    .drawer-head {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--ui-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .drawer-title { font-weight: 600; font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+    .drawer-foot {
+      padding: 10px 14px;
+      border-top: 1px solid var(--ui-border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .drawer-foot-row { display: flex; gap: 6px; }
+    .drawer-foot-row .btn { flex: 1; justify-content: center; font-size: 12px; }
+
+    .config-editor {
+      flex: 1;
+      width: 100%;
+      min-height: 260px;
+      resize: none;
+      border: 1px solid var(--ui-border);
+      border-radius: 7px;
+      background: var(--ui-bg);
+      color: #dbeafe;
+      font-family: var(--ui-mono);
+      font-size: 11.5px;
+      line-height: 1.5;
+      padding: 10px 12px;
+      outline: none;
+      tab-size: 2;
+    }
+    .config-editor:focus { border-color: var(--ui-accent); }
+    .config-error {
+      display: none;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      word-break: break-word;
+    }
+    .config-error.show { display: block; }
+    .config-hint {
+      font-size: 11px;
+      color: var(--ui-muted);
+      line-height: 1.45;
+    }
+    .source-badge {
+      font-family: var(--ui-mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--ui-border);
+      color: var(--ui-muted);
+      background: var(--ui-bg);
+    }
+    .source-badge.override {
+      color: #fbbf24;
+      border-color: rgba(251, 191, 36, 0.4);
+      background: rgba(251, 191, 36, 0.08);
+    }
+    .source-badge.bundle {
+      color: #4ade80;
+      border-color: rgba(74, 222, 128, 0.4);
+      background: rgba(74, 222, 128, 0.08);
+    }
+    .drop-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(12, 13, 16, 0.82);
+      border: 2px dashed var(--ui-accent);
+      z-index: 70;
+      display: none;
+      place-items: center;
+      font-size: 16px;
+      font-weight: 600;
+      color: #93c5fd;
+      pointer-events: none;
+    }
+    .drop-overlay.show { display: grid; }
+    .token-group-title {
+      font-family: var(--ui-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ui-muted);
+      margin: 0 0 8px 0;
+    }
+    .token-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 7px;
+    }
+    .token-name {
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      color: #cbd2e1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .token-ctrl { display: flex; align-items: center; gap: 6px; }
+    .token-color {
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 1px solid var(--ui-border);
+      border-radius: 5px;
+      background: transparent;
+      cursor: pointer;
+    }
+    .token-input {
+      width: 112px;
+      height: 24px;
+      padding: 0 7px;
+      border-radius: 5px;
+      border: 1px solid var(--ui-border);
+      background: var(--ui-bg);
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      color: var(--ui-fg);
+    }
+    .token-input:focus { outline: none; border-color: var(--ui-accent); }
+
+    /* Hint bar */
+    .canvas-hint {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: rgba(23, 25, 32, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--ui-border);
+      border-radius: 7px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--ui-muted);
+      pointer-events: none;
+      display: flex;
+      gap: 12px;
+      z-index: 10;
+    }
+    .canvas-hint kbd {
+      font-family: var(--ui-mono);
+      font-size: 10px;
+      background: var(--ui-surface-2);
+      border: 1px solid var(--ui-border);
+      border-radius: 3px;
+      padding: 1px 4px;
+      color: var(--ui-fg);
+    }
+
+    /* Empty / error state */
+    .empty-state {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+    }
+    .empty-card {
+      max-width: 480px;
+      background: var(--ui-surface);
+      border: 1px solid var(--ui-border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .empty-card h2 { margin: 0 0 8px 0; font-size: 16px; }
+    .empty-card p { margin: 0 0 14px 0; color: var(--ui-muted); line-height: 1.5; }
+    .code-box {
+      font-family: var(--ui-mono);
+      font-size: 12px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+      border-radius: 7px;
+      padding: 10px 12px;
+      text-align: left;
+      color: #93c5fd;
+      overflow-x: auto;
+    }
+
+    /* Prototype Player Overlay */
+    .player-overlay {
+      position: fixed;
+      inset: 0;
+      background: #090a0d;
+      z-index: 45;
+      display: none;
+      flex-direction: column;
+    }
+    .player-overlay.open { display: flex; }
+    .player-bar {
+      height: 48px;
+      background: var(--ui-surface);
+      border-bottom: 1px solid var(--ui-border);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      user-select: none;
+    }
+    .player-left, .player-center, .player-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .player-select {
+      height: 28px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+      border-radius: 6px;
+      padding: 0 10px;
+      color: var(--ui-fg);
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    .player-trail {
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      color: var(--ui-muted);
+      max-width: 340px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .player-stage {
+      flex: 1;
+      display: grid;
+      place-items: center;
+      overflow: auto;
+      padding: 24px;
+      position: relative;
+      background: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px) 0 0 / 24px 24px, #090a0d;
+    }
+    .player-device {
+      position: relative;
+      border-radius: 12px;
+      border: 1px solid var(--ui-border);
+      background: #0b0c0e;
+      overflow: hidden;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7);
+      transition: width 180ms ease, height 180ms ease;
+    }
+    .player-device iframe {
+      display: block;
+      border: 0;
+      transform-origin: 0 0;
+      background: #0b0c0e;
+    }
+    .player-foot {
+      height: 36px;
+      background: var(--ui-surface);
+      border-top: 1px solid var(--ui-border);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--ui-muted);
+    }
+    .player-links-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+    }
+    .player-link-chip {
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      background: rgba(59, 130, 246, 0.12);
+      color: #93c5fd;
+      font-family: var(--ui-mono);
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .player-link-chip:hover { background: rgba(59, 130, 246, 0.24); }
+
+    /* Source modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      place-items: center;
+      z-index: 55;
+      padding: 28px;
+    }
+    .modal-backdrop.open { display: grid; }
+    .modal {
+      width: min(900px, 100%);
+      max-height: 82vh;
+      background: var(--ui-surface);
+      border: 1px solid var(--ui-border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-head {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--ui-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-body {
+      margin: 0;
+      padding: 16px;
+      overflow: auto;
+      font-family: var(--ui-mono);
+      font-size: 12px;
+      line-height: 1.55;
+      color: #d8dee9;
+      background: var(--ui-bg);
+      white-space: pre;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      background: var(--ui-surface-2);
+      border: 1px solid var(--ui-accent);
+      color: var(--ui-fg);
+      padding: 8px 12px;
+      border-radius: 7px;
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 150ms, transform 150ms;
+      pointer-events: none;
+      z-index: 65;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">
+        <span class="brand-mark">D</span>
+        <span id="project-name">Design Studio</span>
+      </div>
+      <span id="frame-count" class="badge">0 frames</span>
+      <div id="group-pills" class="pills"></div>
+    </div>
+
+    <div class="topbar-center">
+      <div class="seg" role="group" aria-label="View mode">
+        <button id="mode-canvas" class="btn active" title="Infinite Canvas (G)">Canvas</button>
+        <button id="mode-grid" class="btn" title="Comparison Grid (G)">Grid</button>
+      </div>
+      <div id="zoom-controls" class="seg" role="group" aria-label="Zoom">
+        <button id="zoom-out" class="btn" title="Zoom out (-)">−</button>
+        <button id="zoom-reset" class="btn" title="Reset zoom (0)">100%</button>
+        <button id="zoom-in" class="btn" title="Zoom in (+)">+</button>
+        <button id="zoom-fit" class="btn" title="Fit all frames (F)">Fit</button>
+      </div>
+      <button id="toggle-flows" class="btn active" title="Show/hide prototype flow arrows (L)">Flows</button>
+    </div>
+
+    <div class="topbar-right">
+      <button id="play-flow" class="btn btn-primary" title="Play interactive prototype (P)">▶ Play</button>
+      <button id="toggle-live" class="btn" title="Auto-reload changed files">
+        <span id="live-dot" class="live-dot"></span>
+        <span>Live</span>
+      </button>
+      <button id="reload-all" class="btn" title="Force reload (R)">Reload</button>
+      <button id="toggle-tokens" class="btn active" title="Toggle Tokens panel (T)">Tokens</button>
+      <button id="toggle-config" class="btn" title="Toggle Config JSON import/export (J)">JSON</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section id="stage-wrap" class="stage-wrap">
+      <div id="canvas-plane" class="canvas-plane"></div>
+      <div id="empty-state" class="empty-state" style="display:none"></div>
+      <div id="canvas-hint" class="canvas-hint">
+        <span><kbd>Space</kbd> + drag pan</span>
+        <span><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll zoom</span>
+        <span><kbd>P</kbd> play</span>
+        <span><kbd>L</kbd> flows</span>
+        <span><kbd>F</kbd> fit</span>
+        <span><kbd>T</kbd> tokens</span>
+        <span><kbd>J</kbd> json</span>
+      </div>
+    </section>
+
+    <aside id="tokens-drawer" class="drawer">
+      <div class="drawer-tabs" role="tablist">
+        <button id="tab-tokens" class="drawer-tab active" role="tab" aria-selected="true">Tokens</button>
+        <button id="tab-config" class="drawer-tab" role="tab" aria-selected="false">Config JSON</button>
+      </div>
+
+      <div id="pane-tokens" class="drawer-pane active">
+        <div class="drawer-head">
+          <span class="drawer-title">Live Tokens</span>
+          <button id="reset-tokens" class="btn btn-ghost" style="height:24px;font-size:11px">Reset</button>
+        </div>
+        <div id="tokens-body" class="drawer-body"></div>
+        <div class="drawer-foot">
+          <div class="drawer-foot-row">
+            <button id="copy-tokens" class="btn">Copy CSS</button>
+            <button id="download-tokens" class="btn">Export .css</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="pane-config" class="drawer-pane">
+        <div class="drawer-head">
+          <span class="drawer-title">
+            <span>frames.json</span>
+            <span id="config-source-badge" class="source-badge">Disk</span>
+          </span>
+          <div style="display:flex;gap:4px">
+            <button id="format-config" class="btn btn-ghost" style="height:24px;font-size:11px" title="Pretty-print JSON">Format</button>
+            <button id="reset-config-disk" class="btn btn-ghost" style="height:24px;font-size:11px;display:none" title="Discard local/imported changes and reload from disk">Disk ↺</button>
+          </div>
+        </div>
+        <div class="drawer-body" style="gap:10px">
+          <textarea id="config-editor" class="config-editor" spellcheck="false" aria-label="Config JSON editor"></textarea>
+          <div id="config-error" class="config-error"></div>
+          <div class="config-hint">Edit JSON and click <strong>Apply</strong> (<kbd>⌘/Ctrl+Enter</kbd>), or drag-and-drop any <code>frames.json</code> or full <code>.design.json</code> bundle onto the page.</div>
+        </div>
+        <div class="drawer-foot">
+          <div class="drawer-foot-row">
+            <button id="apply-config" class="btn btn-primary">Apply JSON</button>
+            <button id="import-json-btn" class="btn">Import .json</button>
+            <input id="import-json-file" type="file" accept=".json,application/json" style="display:none" />
+          </div>
+          <div class="drawer-foot-row">
+            <button id="copy-config" class="btn">Copy</button>
+            <button id="export-config" class="btn" title="Download frames.json manifest">Export JSON</button>
+            <button id="export-bundle" class="btn" title="Download portable JSON containing manifest + tokens + all frame HTML">Export Bundle</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div id="drop-overlay" class="drop-overlay">Drop frames.json or .design.json bundle to import</div>
+
+  <!-- Prototype Player Overlay -->
+  <section id="player-overlay" class="player-overlay" role="dialog" aria-modal="true" aria-label="Prototype Player">
+    <header class="player-bar">
+      <div class="player-left">
+        <button id="player-back" class="btn" title="Back (Alt+Left)">←</button>
+        <button id="player-forward" class="btn" title="Forward (Alt+Right)">→</button>
+        <button id="player-restart" class="btn" title="Restart flow (R)">↺ Restart</button>
+        <select id="player-jump" class="player-select" title="Jump to screen"></select>
+      </div>
+      <div class="player-center">
+        <span id="player-vp" class="badge">1440×900</span>
+        <span id="player-trail" class="player-trail"></span>
+      </div>
+      <div class="player-right">
+        <button id="player-hotspots" class="btn" title="Highlight interactive links (H)">Hotspots (H)</button>
+        <button id="player-close" class="btn btn-primary" title="Exit Play mode (Esc)">Exit Play</button>
+      </div>
+    </header>
+    <div id="player-stage" class="player-stage">
+      <div id="player-device" class="player-device">
+        <iframe id="player-iframe" title="Prototype screen"></iframe>
+      </div>
+    </div>
+    <footer class="player-foot">
+      <div class="player-links-bar" id="player-links-bar"></div>
+      <span>Click any linked control inside the frame · Press <strong>H</strong> to flash hotspots · <strong>Esc</strong> to exit</span>
+    </footer>
+  </section>
+
+  <!-- Source Inspector Modal -->
+  <div id="source-modal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-head">
+        <strong id="modal-title">Source</strong>
+        <div style="display:flex;gap:6px">
+          <button id="modal-copy" class="btn">Copy HTML</button>
+          <button id="modal-close" class="btn">Close</button>
+        </div>
+      </div>
+      <pre id="modal-code" class="modal-body"></pre>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const VIEWPORTS = [
+      { label: 'Native', w: null, h: null },
+      { label: 'Desktop 1440×900', w: 1440, h: 900 },
+      { label: 'Laptop 1280×800', w: 1280, h: 800 },
+      { label: 'Tablet 768×1024', w: 768, h: 1024 },
+      { label: 'Mobile 390×844', w: 390, h: 844 }
+    ];
+
+    const state = {
+      manifest: null,
+      manifestHash: '',
+      localOverride: false,
+      bundleFiles: null, // null | { [filePath]: htmlString }
+      drawerTab: 'tokens', // 'tokens' | 'config'
+      tokensRaw: '',
+      baseTokens: {},
+      overrides: {},
+      fileStamps: {},
+      group: 'all',
+      mode: 'canvas',
+      showFlows: true,
+      live: true,
+      zoom: 0.65,
+      panX: 32,
+      panY: 24,
+      spaceDown: false,
+      dragging: false,
+      dragStart: { x: 0, y: 0, panX: 0, panY: 0 },
+      frameViewport: {},
+      modalSource: '',
+      player: {
+        open: false,
+        startId: null,
+        currentId: null,
+        history: [],
+        index: -1
+      }
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const stageWrap = $('stage-wrap');
+    const canvasPlane = $('canvas-plane');
+    const emptyState = $('empty-state');
+    const tokensDrawer = $('tokens-drawer');
+    const tokensBody = $('tokens-body');
+    const toastEl = $('toast');
+
+    let toastTimer = null;
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+    }
+
+    function allFrames() {
+      return (state.manifest && state.manifest.frames) || [];
+    }
+
+    function visibleFrames() {
+      return allFrames().filter((f) => state.group === 'all' || f.group === state.group);
+    }
+
+    function findFrame(id) {
+      return allFrames().find((f) => f.id === id);
+    }
+
+    function applyTransform() {
+      if (state.mode === 'canvas') {
+        canvasPlane.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+        $('zoom-reset').textContent = `${Math.round(state.zoom * 100)}%`;
+      }
+    }
+
+    function setZoom(nextZoom, pivotX, pivotY) {
+      const clamped = Math.min(2, Math.max(0.15, nextZoom));
+      if (pivotX != null && pivotY != null) {
+        const ratio = clamped / state.zoom;
+        state.panX = pivotX - (pivotX - state.panX) * ratio;
+        state.panY = pivotY - (pivotY - state.panY) * ratio;
+      }
+      state.zoom = clamped;
+      applyTransform();
+    }
+
+    function getCanvasBounds() {
+      const cards = [...canvasPlane.querySelectorAll('.artboard')];
+      if (!cards.length) return null;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const el of cards) {
+        const x = el.offsetLeft;
+        const y = el.offsetTop;
+        const r = x + el.offsetWidth;
+        const b = y + el.offsetHeight;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (r > maxX) maxX = r;
+        if (b > maxY) maxY = b;
+      }
+      return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+    }
+
+    function fitAllFrames() {
+      if (state.mode !== 'canvas') return;
+      const bounds = getCanvasBounds();
+      if (!bounds || !bounds.width || !bounds.height) return;
+      const rect = stageWrap.getBoundingClientRect();
+      const pad = 72;
+      const scale = Math.min(1, Math.max(0.18, Math.min((rect.width - pad) / bounds.width, (rect.height - pad) / bounds.height)));
+      state.zoom = scale;
+      state.panX = (rect.width - bounds.width * scale) / 2 - bounds.minX * scale;
+      state.panY = (rect.height - bounds.height * scale) / 2 - bounds.minY * scale;
+      applyTransform();
+    }
+
+    function focusCanvasFrame(frameId) {
+      const el = canvasPlane.querySelector(`.artboard[data-frame-id="${CSS.escape(frameId)}"]`);
+      if (!el) {
+        // Might be filtered out by group — switch to All and retry
+        if (state.group !== 'all' && findFrame(frameId)) {
+          state.group = 'all';
+          renderGroupPills();
+          renderFrames();
+          requestAnimationFrame(() => focusCanvasFrame(frameId));
+        }
+        return;
+      }
+      document.querySelectorAll('.artboard.focused').forEach((n) => n.classList.remove('focused'));
+      el.classList.add('focused');
+      setTimeout(() => el.classList.remove('focused'), 1400);
+
+      if (state.mode === 'canvas') {
+        const rect = stageWrap.getBoundingClientRect();
+        const cx = el.offsetLeft + el.offsetWidth / 2;
+        const cy = el.offsetTop + el.offsetHeight / 2;
+        const targetZoom = Math.min(0.85, Math.max(state.zoom, 0.55));
+        state.zoom = targetZoom;
+        state.panX = rect.width / 2 - cx * targetZoom;
+        state.panY = rect.height / 2 - cy * targetZoom;
+        applyTransform();
+      } else {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const target = findFrame(frameId);
+      showToast(`→ ${target ? target.title : frameId}`);
+    }
+
+    /* ---------------- Token Drawer ---------------- */
+    function parseTokensCss(css) {
+      const tokens = {};
+      const rootMatch = css.match(/:root\s*\{([\s\S]*?)\}/);
+      if (!rootMatch) return tokens;
+      const re = /(--[a-zA-Z0-9_-]+)\s*:\s*([^;]+);/g;
+      let m;
+      while ((m = re.exec(rootMatch[1])) !== null) {
+        tokens[m[1].trim()] = m[2].trim();
+      }
+      return tokens;
+    }
+
+    function isHexColor(v) { return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v); }
+    function expandHex(v) { return v.length === 4 ? '#' + v[1]+v[1] + v[2]+v[2] + v[3]+v[3] : v; }
+    function groupForToken(name) {
+      if (name.startsWith('--color-')) return 'Colors';
+      if (name.startsWith('--font-') || name.includes('size') || name.includes('scale')) return 'Typography';
+      if (name.startsWith('--radius-')) return 'Radii';
+      if (name.startsWith('--space-')) return 'Spacing';
+      if (name.startsWith('--motion-')) return 'Motion';
+      return 'Other';
+    }
+
+    function applyTokenOverridesToIframe(iframe) {
+      try {
+        const root = iframe.contentDocument && iframe.contentDocument.documentElement;
+        if (!root) return;
+        for (const [k, v] of Object.entries(state.overrides)) {
+          root.style.setProperty(k, v);
+        }
+      } catch (_) {}
+    }
+
+    function applyAllTokenOverrides() {
+      document.querySelectorAll('.frame-shell iframe, #player-iframe').forEach(applyTokenOverridesToIframe);
+    }
+
+    function renderTokensDrawer() {
+      tokensBody.innerHTML = '';
+      const entries = Object.entries(state.baseTokens);
+      if (!entries.length) {
+        tokensBody.innerHTML = '<div style="color:var(--ui-muted);font-size:12px">No <code>:root</code> CSS variables found in <code>tokens.css</code>.</div>';
+        return;
+      }
+      const grouped = {};
+      for (const [k, v] of entries) {
+        (grouped[groupForToken(k)] ||= []).push([k, v]);
+      }
+      for (const [group, items] of Object.entries(grouped)) {
+        const sec = document.createElement('div');
+        const h = document.createElement('div');
+        h.className = 'token-group-title';
+        h.textContent = group;
+        sec.appendChild(h);
+
+        for (const [name, baseVal] of items) {
+          const val = state.overrides[name] ?? baseVal;
+          const row = document.createElement('div');
+          row.className = 'token-row';
+
+          const label = document.createElement('div');
+          label.className = 'token-name';
+          label.title = name;
+          label.textContent = name.replace(/^--/, '');
+
+          const ctrl = document.createElement('div');
+          ctrl.className = 'token-ctrl';
+
+          const text = document.createElement('input');
+          text.className = 'token-input';
+          text.value = val;
+
+          if (isHexColor(val)) {
+            const picker = document.createElement('input');
+            picker.type = 'color';
+            picker.className = 'token-color';
+            picker.value = expandHex(val);
+            picker.addEventListener('input', () => {
+              text.value = picker.value;
+              state.overrides[name] = picker.value;
+              applyAllTokenOverrides();
+            });
+            text.addEventListener('input', () => {
+              state.overrides[name] = text.value;
+              if (isHexColor(text.value)) picker.value = expandHex(text.value);
+              applyAllTokenOverrides();
+            });
+            ctrl.appendChild(picker);
+          } else {
+            text.addEventListener('input', () => {
+              state.overrides[name] = text.value;
+              applyAllTokenOverrides();
+            });
+          }
+
+          ctrl.appendChild(text);
+          row.appendChild(label);
+          row.appendChild(ctrl);
+          sec.appendChild(row);
+        }
+        tokensBody.appendChild(sec);
+      }
+    }
+
+    function serializeTokensCss() {
+      const merged = { ...state.baseTokens, ...state.overrides };
+      const lines = [':root {'];
+      for (const [k, v] of Object.entries(merged)) lines.push(`  ${k}: ${v};`);
+      lines.push('}', '');
+      return lines.join('\n');
+    }
+
+    /* ---------------- Prototype Bridge ---------------- */
+    function handleNavigate(targetId, fromPlayer) {
+      if (!targetId) return;
+      if (!findFrame(targetId)) {
+        showToast(`Unknown target frame: ${targetId}`);
+        return;
+      }
+      if (fromPlayer || state.player.open) {
+        navigatePlayer(targetId, true);
+      } else {
+        focusCanvasFrame(targetId);
+      }
+    }
+
+    function wireIframeLinks(iframe, isPlayer) {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc || doc.__studioWired) return;
+        doc.__studioWired = true;
+
+        // Inject hotspot highlight animation style into frame document
+        const st = doc.createElement('style');
+        st.textContent = `
+          @keyframes __studioHotspotPulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.85); outline: 2px solid #60a5fa; outline-offset: 2px; }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); outline: 2px solid #60a5fa; outline-offset: 2px; }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); outline: 2px solid transparent; outline-offset: 2px; }
+          }
+          .__studio-hotspot-flash {
+            animation: __studioHotspotPulse 900ms ease-out 2;
+          }
+        `;
+        doc.head.appendChild(st);
+
+        doc.addEventListener('click', (e) => {
+          const el = e.target && e.target.closest ? e.target.closest('[data-goto]') : null;
+          if (!el) return;
+          if (el.tagName === 'FORM') return; // handled by submit
+          const target = el.getAttribute('data-goto');
+          if (!target) return;
+          e.preventDefault();
+          handleNavigate(target, isPlayer);
+        });
+
+        doc.addEventListener('submit', (e) => {
+          const form = e.target && e.target.closest ? e.target.closest('form[data-goto]') : null;
+          if (!form) return;
+          const target = form.getAttribute('data-goto');
+          if (!target) return;
+          e.preventDefault();
+          handleNavigate(target, isPlayer);
+        });
+      } catch (_) {}
+    }
+
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'studio:goto' && e.data.to) {
+        handleNavigate(e.data.to, state.player.open);
+      }
+    });
+
+    /* ---------------- Prototype Player ---------------- */
+    function renderPlayerChrome() {
+      const frame = findFrame(state.player.currentId);
+      if (!frame) return;
+
+      const sel = $('player-jump');
+      sel.innerHTML = '';
+      for (const f of allFrames()) {
+        const o = document.createElement('option');
+        o.value = f.id;
+        o.textContent = f.title || f.id;
+        if (f.id === frame.id) o.selected = true;
+        sel.appendChild(o);
+      }
+
+      const vp = frame.viewport || { width: 1280, height: 800 };
+      $('player-vp').textContent = `${vp.width}×${vp.height}`;
+      $('player-back').disabled = state.player.index <= 0;
+      $('player-forward').disabled = state.player.index >= state.player.history.length - 1;
+
+      const trailNames = state.player.history.slice(0, state.player.index + 1).map((id) => {
+        const f = findFrame(id);
+        return f ? f.id : id;
+      });
+      $('player-trail').textContent = trailNames.join(' → ');
+
+      // Render outgoing link chips in footer
+      const linksBar = $('player-links-bar');
+      linksBar.innerHTML = '';
+      const links = frame.links || [];
+      if (links.length) {
+        const lbl = document.createElement('span');
+        lbl.textContent = 'Links:';
+        linksBar.appendChild(lbl);
+        for (const lk of links) {
+          const target = findFrame(lk.to);
+          const chip = document.createElement('button');
+          chip.className = 'player-link-chip';
+          chip.textContent = `${lk.label || (target ? target.title : lk.to)} →`;
+          chip.onclick = () => navigatePlayer(lk.to, true);
+          linksBar.appendChild(chip);
+        }
+      } else {
+        linksBar.textContent = 'End of flow (no outgoing links)';
+      }
+
+      sizePlayerDevice(vp.width, vp.height);
+    }
+
+    function sizePlayerDevice(w, h) {
+      const stage = $('player-stage');
+      const rect = stage.getBoundingClientRect();
+      const availW = Math.max(320, rect.width - 48);
+      const availH = Math.max(320, rect.height - 48);
+      const scale = Math.min(1, availW / w, availH / h);
+      const dev = $('player-device');
+      const ifr = $('player-iframe');
+      dev.style.width = `${Math.round(w * scale)}px`;
+      dev.style.height = `${Math.round(h * scale)}px`;
+      ifr.style.width = `${w}px`;
+      ifr.style.height = `${h}px`;
+      ifr.style.transform = `scale(${scale})`;
+    }
+
+    function navigatePlayer(frameId, pushHistory) {
+      const frame = findFrame(frameId);
+      if (!frame) return;
+      if (pushHistory) {
+        if (state.player.history[state.player.index] !== frameId) {
+          state.player.history = state.player.history.slice(0, state.player.index + 1);
+          state.player.history.push(frameId);
+          state.player.index = state.player.history.length - 1;
+        }
+      }
+      state.player.currentId = frameId;
+      const ifr = $('player-iframe');
+      ifr.onload = () => {
+        applyTokenOverridesToIframe(ifr);
+        wireIframeLinks(ifr, true);
+      };
+      setIframeFrameContent(ifr, frame, Date.now());
+      renderPlayerChrome();
+    }
+
+    function openPlayer(startId) {
+      const frames = visibleFrames();
+      const entry =
+        (startId && findFrame(startId)) ||
+        (state.manifest && state.manifest.entry && findFrame(state.manifest.entry)) ||
+        frames[0] ||
+        allFrames()[0];
+      if (!entry) {
+        showToast('No frames to play');
+        return;
+      }
+      state.player.open = true;
+      state.player.startId = entry.id;
+      state.player.history = [entry.id];
+      state.player.index = 0;
+      $('player-overlay').classList.add('open');
+      navigatePlayer(entry.id, false);
+    }
+
+    function closePlayer() {
+      state.player.open = false;
+      $('player-overlay').classList.remove('open');
+    }
+
+    function flashPlayerHotspots() {
+      try {
+        const doc = $('player-iframe').contentDocument;
+        if (!doc) return;
+        const els = [...doc.querySelectorAll('[data-goto]')];
+        if (!els.length) {
+          showToast('No [data-goto] hotspots in this frame');
+          return;
+        }
+        els.forEach((el) => {
+          el.classList.remove('__studio-hotspot-flash');
+          void el.offsetWidth;
+          el.classList.add('__studio-hotspot-flash');
+        });
+        showToast(`Highlighted ${els.length} clickable hotspot${els.length === 1 ? '' : 's'}`);
+      } catch (_) {}
+    }
+
+    /* ---------------- Canvas Flow Connectors ---------------- */
+    function renderFlowConnectors() {
+      const existing = canvasPlane.querySelector('.flow-svg');
+      if (existing) existing.remove();
+      if (state.mode !== 'canvas' || !state.showFlows) return;
+
+      const cards = new Map();
+      canvasPlane.querySelectorAll('.artboard').forEach((el) => {
+        const shell = el.querySelector('.frame-shell');
+        if (!shell) return;
+        cards.set(el.dataset.frameId, {
+          x: el.offsetLeft + shell.offsetLeft,
+          y: el.offsetTop + shell.offsetTop,
+          w: shell.offsetWidth,
+          h: shell.offsetHeight
+        });
+      });
+
+      const edges = [];
+      for (const f of visibleFrames()) {
+        if (!cards.has(f.id) || !Array.isArray(f.links)) continue;
+        for (const lk of f.links) {
+          if (cards.has(lk.to) && lk.to !== f.id) {
+            edges.push({ from: f.id, to: lk.to, label: lk.label || '' });
+          }
+        }
+      }
+      if (!edges.length) return;
+
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(svgNS, 'svg');
+      svg.classList.add('flow-svg');
+      svg.setAttribute('width', '1');
+      svg.setAttribute('height', '1');
+
+      const defs = document.createElementNS(svgNS, 'defs');
+      defs.innerHTML = `
+        <marker id="arrow-fwd" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 1 1.5 L 8.5 5 L 1 8.5 z" fill="#60a5fa" />
+        </marker>
+        <marker id="arrow-back" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 1 1.5 L 8.5 5 L 1 8.5 z" fill="#94a3b8" />
+        </marker>
+      `;
+      svg.appendChild(defs);
+
+      // Group outgoing/incoming counts for clean vertical spacing on shared edges
+      const pairCount = {};
+      edges.forEach((edge) => {
+        const a = cards.get(edge.from);
+        const b = cards.get(edge.to);
+        const key = `${edge.from}->${edge.to}`;
+        const idx = (pairCount[key] = (pairCount[key] || 0) + 1) - 1;
+
+        const aCx = a.x + a.w / 2;
+        const bCx = b.x + b.w / 2;
+        const aCy = a.y + a.h / 2;
+        const bCy = b.y + b.h / 2;
+        const dx = bCx - aCx;
+        const dy = bCy - aCy;
+        const isBack = dx < -40;
+
+        let x1, y1, x2, y2, c1x, c1y, c2x, c2y;
+        const slot = (idx - 0.5) * 32;
+
+        if (Math.abs(dx) >= Math.abs(dy) * 0.65) {
+          // Horizontal flow (left→right or right→left)
+          if (!isBack) {
+            x1 = a.x + a.w;
+            y1 = aCy + slot;
+            x2 = b.x - 4;
+            y2 = bCy + slot;
+            const bend = Math.max(70, Math.min(240, Math.abs(x2 - x1) * 0.45));
+            c1x = x1 + bend; c1y = y1;
+            c2x = x2 - bend; c2y = y2;
+          } else {
+            // Loop back cleanly over the top/bottom to avoid cutting across screens
+            x1 = aCx + 40;
+            y1 = a.y - 4;
+            x2 = bCx - 40;
+            y2 = b.y - 4;
+            const arcY = Math.min(a.y, b.y) - Math.max(90, Math.min(200, Math.abs(x1 - x2) * 0.14));
+            c1x = x1; c1y = arcY;
+            c2x = x2; c2y = arcY;
+          }
+        } else {
+          // Vertical flow (top→bottom or bottom→top)
+          if (dy >= 0) {
+            x1 = aCx + slot; y1 = a.y + a.h;
+            x2 = bCx + slot; y2 = b.y - 4;
+            const bend = Math.max(60, Math.abs(y2 - y1) * 0.45);
+            c1x = x1; c1y = y1 + bend;
+            c2x = x2; c2y = y2 - bend;
+          } else {
+            x1 = aCx - 48 + slot; y1 = a.y - 4;
+            x2 = bCx - 48 + slot; y2 = b.y + b.h + 4;
+            const bend = Math.max(60, Math.abs(y2 - y1) * 0.45);
+            c1x = x1; c1y = y1 - bend;
+            c2x = x2; c2y = y2 + bend;
+          }
+        }
+
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`);
+        path.setAttribute('class', 'flow-path' + (isBack ? ' back' : ''));
+        path.setAttribute('marker-end', isBack ? 'url(#arrow-back)' : 'url(#arrow-fwd)');
+        svg.appendChild(path);
+
+        // Origin dot
+        const dot = document.createElementNS(svgNS, 'circle');
+        dot.setAttribute('cx', x1);
+        dot.setAttribute('cy', y1);
+        dot.setAttribute('r', '4');
+        dot.setAttribute('fill', isBack ? '#94a3b8' : '#60a5fa');
+        svg.appendChild(dot);
+
+        // Midpoint label pill (cubic bezier at t=0.5)
+        if (edge.label) {
+          const mx = 0.125 * x1 + 0.375 * c1x + 0.375 * c2x + 0.125 * x2;
+          const my = 0.125 * y1 + 0.375 * c1y + 0.375 * c2y + 0.125 * y2;
+          const padX = 8;
+          const approxW = edge.label.length * 6.8 + padX * 2;
+          const h = 22;
+
+          const rect = document.createElementNS(svgNS, 'rect');
+          rect.setAttribute('x', mx - approxW / 2);
+          rect.setAttribute('y', my - h / 2);
+          rect.setAttribute('width', approxW);
+          rect.setAttribute('height', h);
+          rect.setAttribute('rx', '6');
+          rect.setAttribute('class', 'flow-label-bg' + (isBack ? ' back' : ''));
+          svg.appendChild(rect);
+
+          const txt = document.createElementNS(svgNS, 'text');
+          txt.setAttribute('x', mx);
+          txt.setAttribute('y', my + 4);
+          txt.setAttribute('text-anchor', 'middle');
+          txt.setAttribute('class', 'flow-label-text' + (isBack ? ' back' : ''));
+          txt.textContent = edge.label;
+          svg.appendChild(txt);
+        }
+      });
+
+      canvasPlane.appendChild(svg);
+    }
+
+    /* ---------------- Canvas & Grid Rendering ---------------- */
+    function renderGroupPills() {
+      const container = $('group-pills');
+      container.innerHTML = '';
+      const groups = ['all', ...new Set(allFrames().map((f) => f.group).filter(Boolean))];
+      if (groups.length <= 2) return;
+      for (const g of groups) {
+        const btn = document.createElement('button');
+        btn.className = 'btn' + (state.group === g ? ' active' : '');
+        btn.textContent = g === 'all' ? 'All' : g;
+        btn.onclick = () => {
+          state.group = g;
+          renderGroupPills();
+          renderFrames();
+          requestAnimationFrame(fitAllFrames);
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    function showEmpty(title, body, cmd) {
+      emptyState.style.display = 'grid';
+      emptyState.innerHTML = `
+        <div class="empty-card">
+          <h2>${title}</h2>
+          <p>${body}</p>
+          ${cmd ? `<div class="code-box">${cmd}</div>` : ''}
+        </div>
+      `;
+    }
+
+    function sizeFrameEl(shell, iframe, w, h) {
+      if (state.mode === 'grid') {
+        const containerW = Math.max(320, shell.parentElement.clientWidth || 460);
+        const scale = Math.min(1, containerW / w);
+        shell.style.width = `${Math.round(w * scale)}px`;
+        shell.style.height = `${Math.round(h * scale)}px`;
+        iframe.style.width = `${w}px`;
+        iframe.style.height = `${h}px`;
+        iframe.style.transform = `scale(${scale})`;
+      } else {
+        shell.style.width = `${w}px`;
+        shell.style.height = `${h}px`;
+        iframe.style.width = `${w}px`;
+        iframe.style.height = `${h}px`;
+        iframe.style.transform = 'none';
+      }
+    }
+
+    function renderFrames(bust = Date.now()) {
+      const frames = visibleFrames();
+      $('project-name').textContent = (state.manifest && state.manifest.project) || 'Design Studio';
+      $('frame-count').textContent = `${frames.length} frame${frames.length === 1 ? '' : 's'}`;
+
+      const hasCoords = state.mode === 'canvas' && frames.some((f) => f.position && typeof f.position.x === 'number');
+      canvasPlane.classList.toggle('positioned', hasCoords);
+      canvasPlane.innerHTML = '';
+
+      if (!frames.length) {
+        showEmpty(
+          'No frames yet',
+          'Ask any coding agent to create screens using skills/design/SKILL.md, or add entries to .design/frames.json.'
+        );
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      let autoX = 80;
+      for (const frame of frames) {
+        const nativeVp = frame.viewport || { width: 1280, height: 800 };
+        const vp = state.frameViewport[frame.id] || nativeVp;
+        const linkCount = Array.isArray(frame.links) ? frame.links.length : 0;
+
+        const card = document.createElement('article');
+        card.className = 'artboard';
+        card.dataset.frameId = frame.id;
+        if (hasCoords) {
+          const pos = frame.position || { x: autoX, y: 80 };
+          card.style.left = `${pos.x}px`;
+          card.style.top = `${pos.y}px`;
+          autoX = Math.max(autoX, pos.x + vp.width + 120);
+        }
+
+        const head = document.createElement('div');
+        head.className = 'artboard-head';
+
+        const meta = document.createElement('div');
+        meta.className = 'artboard-meta';
+        meta.innerHTML = `
+          <span class="artboard-title">${frame.title || frame.id}</span>
+          ${frame.status ? `<span class="status-pill ${frame.status}">${frame.status}</span>` : ''}
+          ${linkCount ? `<span class="link-count" title="${linkCount} prototype link(s)">${linkCount}→</span>` : ''}
+        `;
+
+        const tools = document.createElement('div');
+        tools.className = 'artboard-tools';
+
+        const playBtn = document.createElement('button');
+        playBtn.className = 'btn';
+        playBtn.textContent = '▶';
+        playBtn.title = `Play prototype starting from ${frame.title || frame.id}`;
+        playBtn.onclick = () => openPlayer(frame.id);
+
+        const vpSelect = document.createElement('select');
+        vpSelect.className = 'vp-select';
+        vpSelect.title = 'Viewport size';
+        VIEWPORTS.forEach((opt, idx) => {
+          const o = document.createElement('option');
+          o.value = idx;
+          o.textContent = idx === 0 ? `${nativeVp.width}×${nativeVp.height}` : opt.label;
+          if ((idx === 0 && !state.frameViewport[frame.id]) || (opt.w === vp.width && opt.h === vp.height && state.frameViewport[frame.id])) {
+            o.selected = true;
+          }
+          vpSelect.appendChild(o);
+        });
+
+        const srcBtn = document.createElement('button');
+        srcBtn.className = 'btn';
+        srcBtn.textContent = 'HTML';
+        srcBtn.onclick = async () => {
+          state.modalSource = await readFrameHtml(frame);
+          $('modal-title').textContent = `${frame.title || frame.id} — ${frame.file}`;
+          $('modal-code').textContent = state.modalSource;
+          $('source-modal').classList.add('open');
+        };
+
+        const openBtn = document.createElement('button');
+        openBtn.className = 'btn';
+        openBtn.textContent = '↗';
+        openBtn.title = 'Open frame in new tab';
+        openBtn.onclick = () => window.open(frame.file, '_blank');
+
+        tools.appendChild(playBtn);
+        tools.appendChild(vpSelect);
+        tools.appendChild(srcBtn);
+        tools.appendChild(openBtn);
+        head.appendChild(meta);
+        head.appendChild(tools);
+
+        const shell = document.createElement('div');
+        shell.className = 'frame-shell';
+
+        const iframe = document.createElement('iframe');
+        iframe.title = frame.title || frame.id;
+        iframe.addEventListener('load', () => {
+          applyTokenOverridesToIframe(iframe);
+          wireIframeLinks(iframe, false);
+        });
+        setIframeFrameContent(iframe, frame, bust);
+        shell.appendChild(iframe);
+
+        card.appendChild(head);
+        card.appendChild(shell);
+
+        if (frame.notes) {
+          const notes = document.createElement('div');
+          notes.className = 'artboard-notes';
+          notes.textContent = frame.notes;
+          card.appendChild(notes);
+        }
+
+        canvasPlane.appendChild(card);
+        sizeFrameEl(shell, iframe, vp.width, vp.height);
+
+        vpSelect.addEventListener('change', () => {
+          const chosen = VIEWPORTS[Number(vpSelect.value)];
+          const next = chosen.w ? { width: chosen.w, height: chosen.h } : nativeVp;
+          if (chosen.w) state.frameViewport[frame.id] = next;
+          else delete state.frameViewport[frame.id];
+          sizeFrameEl(shell, iframe, next.width, next.height);
+          renderFlowConnectors();
+        });
+      }
+
+      requestAnimationFrame(() => {
+        renderFlowConnectors();
+        applyTransform();
+      });
+    }
+
+    async function loadTokens(force = false) {
+      try {
+        const res = await fetch(`tokens.css?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const css = await res.text();
+        if (force || css !== state.tokensRaw) {
+          state.tokensRaw = css;
+          state.baseTokens = parseTokensCss(css);
+          renderTokensDrawer();
+          if (!force) {
+            document.querySelectorAll('.frame-shell iframe, #player-iframe').forEach((ifr) => {
+              if (!ifr.src) return;
+              const base = ifr.src.split('?')[0];
+              ifr.src = `${base}?t=${Date.now()}`;
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function loadManifest(initial = false) {
+      if (location.protocol === 'file:') {
+        showEmpty(
+          'Serve .design/ over HTTP',
+          'Browsers block local fetch() on file:// URLs. Run a local static server from your repo root:',
+          'python3 -m http.server 4173 -d .design\n# open http://localhost:4173'
+        );
+        return;
+      }
+      if (state.localOverride && !initial) return;
+      try {
+        const res = await fetch(`frames.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const raw = await res.text();
+        if (raw !== state.manifestHash) {
+          state.manifestHash = raw;
+          state.manifest = JSON.parse(raw);
+          syncConfigEditor();
+          renderGroupPills();
+          renderFrames();
+          if (initial) requestAnimationFrame(() => requestAnimationFrame(fitAllFrames));
+          if (state.player.open) renderPlayerChrome();
+        }
+      } catch (err) {
+        if (state.manifest) return;
+        showEmpty(
+          'Could not load .design/frames.json',
+          `Serve the .design directory over HTTP and ensure frames.json exists (${err.message}). Or import a .json config/bundle via the JSON panel.`,
+          'python3 -m http.server 4173 -d .design'
+        );
+      }
+    }
+
+    async function pollChangedFiles() {
+      if (!state.live || location.protocol === 'file:' || state.localOverride) return;
+      await loadManifest(false);
+      await loadTokens(false);
+      for (const f of allFrames()) {
+        try {
+          const res = await fetch(`${f.file}?t=${Date.now()}`, { method: 'HEAD', cache: 'no-store' });
+          const stamp = res.headers.get('etag') || res.headers.get('last-modified') || res.headers.get('content-length') || '';
+          if (stamp && state.fileStamps[f.id] && state.fileStamps[f.id] !== stamp) {
+            const ifr = document.querySelector(`.artboard[data-frame-id="${CSS.escape(f.id)}"] iframe`);
+            if (ifr) ifr.src = `${f.file}?t=${Date.now()}`;
+            if (state.player.open && state.player.currentId === f.id) {
+              navigatePlayer(f.id, false);
+            }
+          }
+          if (stamp) state.fileStamps[f.id] = stamp;
+        } catch (_) {}
+      }
+    }
+
+    // View mode switching
+    function setMode(mode) {
+      state.mode = mode;
+      stageWrap.classList.toggle('grid-mode', mode === 'grid');
+      $('mode-canvas').classList.toggle('active', mode === 'canvas');
+      $('mode-grid').classList.toggle('active', mode === 'grid');
+      $('zoom-controls').style.display = mode === 'canvas' ? 'inline-flex' : 'none';
+      $('toggle-flows').style.display = mode === 'canvas' ? 'inline-flex' : 'none';
+      $('canvas-hint').style.display = mode === 'canvas' ? 'flex' : 'none';
+      renderFrames();
+      if (mode === 'canvas') requestAnimationFrame(() => requestAnimationFrame(fitAllFrames));
+    }
+
+    // Controls
+    $('mode-canvas').onclick = () => setMode('canvas');
+    $('mode-grid').onclick = () => setMode('grid');
+    $('zoom-in').onclick = () => setZoom(state.zoom * 1.15);
+    $('zoom-out').onclick = () => setZoom(state.zoom / 1.15);
+    $('zoom-reset').onclick = () => setZoom(1);
+    $('zoom-fit').onclick = fitAllFrames;
+
+    $('toggle-flows').onclick = () => {
+      state.showFlows = !state.showFlows;
+      $('toggle-flows').classList.toggle('active', state.showFlows);
+      stageWrap.classList.toggle('hide-flows', !state.showFlows);
+      renderFlowConnectors();
+    };
+
+    $('play-flow').onclick = () => openPlayer();
+    $('player-close').onclick = closePlayer;
+    $('player-restart').onclick = () => openPlayer(state.player.startId);
+    $('player-hotspots').onclick = flashPlayerHotspots;
+    $('player-jump').onchange = (e) => navigatePlayer(e.target.value, true);
+    $('player-back').onclick = () => {
+      if (state.player.index > 0) {
+        state.player.index -= 1;
+        navigatePlayer(state.player.history[state.player.index], false);
+      }
+    };
+    $('player-forward').onclick = () => {
+      if (state.player.index < state.player.history.length - 1) {
+        state.player.index += 1;
+        navigatePlayer(state.player.history[state.player.index], false);
+      }
+    };
+
+    $('toggle-live').onclick = () => {
+      state.live = !state.live;
+      $('live-dot').classList.toggle('paused', !state.live);
+      showToast(state.live ? 'Live reload resumed' : 'Live reload paused');
+    };
+    $('reload-all').onclick = async () => {
+      state.localOverride = false;
+      state.bundleFiles = null;
+      state.manifestHash = '';
+      updateSourceBadge();
+      await loadTokens(true);
+      await loadManifest(false);
+      showToast('Reloaded frames & tokens from disk');
+    };
+    function setDrawerTab(tab, forceOpen = false) {
+      const isHidden = tokensDrawer.classList.contains('hidden');
+      if (!forceOpen && !isHidden && state.drawerTab === tab) {
+        tokensDrawer.classList.add('hidden');
+        $('toggle-tokens').classList.remove('active');
+        $('toggle-config').classList.remove('active');
+        return;
+      }
+      state.drawerTab = tab;
+      tokensDrawer.classList.remove('hidden');
+      tokensDrawer.classList.toggle('wide', tab === 'config');
+      $('tab-tokens').classList.toggle('active', tab === 'tokens');
+      $('tab-config').classList.toggle('active', tab === 'config');
+      $('tab-tokens').setAttribute('aria-selected', String(tab === 'tokens'));
+      $('tab-config').setAttribute('aria-selected', String(tab === 'config'));
+      $('pane-tokens').classList.toggle('active', tab === 'tokens');
+      $('pane-config').classList.toggle('active', tab === 'config');
+      $('toggle-tokens').classList.toggle('active', tab === 'tokens');
+      $('toggle-config').classList.toggle('active', tab === 'config');
+      if (tab === 'config') syncConfigEditor();
+    }
+
+    $('toggle-tokens').onclick = () => setDrawerTab('tokens');
+    $('toggle-config').onclick = () => setDrawerTab('config');
+    $('tab-tokens').onclick = () => setDrawerTab('tokens', true);
+    $('tab-config').onclick = () => setDrawerTab('config', true);
+
+    /* ---------------- Config JSON & Bundle Import / Export ---------------- */
+    function inlineTokensIntoHtml(html) {
+      const css = serializeTokensCss();
+      const styleTag = `<style data-studio-tokens>\n${css}</style>`;
+      if (/<link[^>]*tokens\.css[^>]*>/i.test(html)) {
+        return html.replace(/<link[^>]*tokens\.css[^>]*>/i, styleTag);
+      }
+      return html.replace(/<\/head>/i, `${styleTag}\n</head>`);
+    }
+
+    function setIframeFrameContent(iframe, frame, bust) {
+      if (state.bundleFiles && typeof state.bundleFiles[frame.file] === 'string') {
+        iframe.removeAttribute('src');
+        iframe.srcdoc = inlineTokensIntoHtml(state.bundleFiles[frame.file]);
+      } else {
+        iframe.removeAttribute('srcdoc');
+        iframe.src = `${frame.file}?t=${bust}`;
+      }
+    }
+
+    async function readFrameHtml(frame) {
+      if (state.bundleFiles && typeof state.bundleFiles[frame.file] === 'string') {
+        return state.bundleFiles[frame.file];
+      }
+      const res = await fetch(`${frame.file}?t=${Date.now()}`);
+      return await res.text();
+    }
+
+    function updateSourceBadge() {
+      const badge = $('config-source-badge');
+      const resetBtn = $('reset-config-disk');
+      if (state.bundleFiles) {
+        const count = Object.keys(state.bundleFiles).length;
+        badge.textContent = `Bundle (${count} files)`;
+        badge.className = 'source-badge bundle';
+        resetBtn.style.display = 'inline-flex';
+      } else if (state.localOverride) {
+        badge.textContent = 'Edited';
+        badge.className = 'source-badge override';
+        resetBtn.style.display = 'inline-flex';
+      } else {
+        badge.textContent = 'Disk';
+        badge.className = 'source-badge';
+        resetBtn.style.display = 'none';
+      }
+    }
+
+    function syncConfigEditor() {
+      if (!state.manifest) return;
+      const editor = $('config-editor');
+      if (document.activeElement !== editor) {
+        editor.value = JSON.stringify(state.manifest, null, 2);
+      }
+      $('config-error').classList.remove('show');
+      updateSourceBadge();
+    }
+
+    function showConfigError(msg) {
+      const el = $('config-error');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    function applyImportedData(parsed, label = 'Applied JSON') {
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Root JSON value must be an object.');
+      }
+      // Full portable bundle: { version, manifest, tokens?, files }
+      if (parsed.manifest && Array.isArray(parsed.manifest.frames) && parsed.files && typeof parsed.files === 'object') {
+        state.manifest = parsed.manifest;
+        state.bundleFiles = parsed.files;
+        state.localOverride = true;
+        if (typeof parsed.tokens === 'string' && parsed.tokens.trim()) {
+          state.tokensRaw = parsed.tokens;
+          state.baseTokens = parseTokensCss(parsed.tokens);
+          state.overrides = {};
+          renderTokensDrawer();
+        }
+      } else if (Array.isArray(parsed.frames)) {
+        // Plain frames.json manifest
+        state.manifest = parsed;
+        state.localOverride = true;
+      } else {
+        throw new Error('Expected either a frames.json manifest ({ frames: [...] }) or a studio bundle ({ manifest, files }).');
+      }
+      state.group = 'all';
+      $('config-editor').value = JSON.stringify(state.manifest, null, 2);
+      $('config-error').classList.remove('show');
+      updateSourceBadge();
+      renderGroupPills();
+      renderFrames();
+      requestAnimationFrame(() => requestAnimationFrame(fitAllFrames));
+      if (state.player.open) renderPlayerChrome();
+      showToast(label);
+    }
+
+    function downloadJsonFile(filename, dataObj) {
+      const blob = new Blob([JSON.stringify(dataObj, null, 2) + '\n'], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    $('apply-config').onclick = () => {
+      try {
+        const parsed = JSON.parse($('config-editor').value);
+        applyImportedData(parsed, 'Applied config JSON to canvas');
+      } catch (err) {
+        showConfigError(`Invalid JSON: ${err.message}`);
+      }
+    };
+
+    $('format-config').onclick = () => {
+      try {
+        const parsed = JSON.parse($('config-editor').value);
+        $('config-editor').value = JSON.stringify(parsed, null, 2);
+        $('config-error').classList.remove('show');
+      } catch (err) {
+        showConfigError(`Invalid JSON: ${err.message}`);
+      }
+    };
+
+    $('reset-config-disk').onclick = async () => {
+      state.localOverride = false;
+      state.bundleFiles = null;
+      state.manifestHash = '';
+      updateSourceBadge();
+      await loadTokens(true);
+      await loadManifest(true);
+      showToast('Restored config from disk');
+    };
+
+    $('copy-config').onclick = async () => {
+      const text = $('config-editor').value || JSON.stringify(state.manifest || {}, null, 2);
+      await navigator.clipboard.writeText(text);
+      showToast('Copied frames.json to clipboard');
+    };
+
+    $('export-config').onclick = () => {
+      try {
+        const parsed = JSON.parse($('config-editor').value || JSON.stringify(state.manifest || {}));
+        downloadJsonFile('frames.json', parsed);
+        showToast('Exported frames.json');
+      } catch (err) {
+        showConfigError(`Cannot export invalid JSON: ${err.message}`);
+      }
+    };
+
+    $('export-bundle').onclick = async () => {
+      try {
+        const manifest = JSON.parse($('config-editor').value || JSON.stringify(state.manifest || {}));
+        const files = {};
+        for (const f of (manifest.frames || [])) {
+          if (f.file) files[f.file] = await readFrameHtml(f);
+        }
+        const bundle = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          manifest,
+          tokens: serializeTokensCss(),
+          files
+        };
+        const slug = (manifest.project || 'design-studio').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        downloadJsonFile(`${slug || 'studio'}.design.json`, bundle);
+        showToast(`Exported portable bundle (${Object.keys(files).length} frames)`);
+      } catch (err) {
+        showConfigError(`Bundle export failed: ${err.message}`);
+      }
+    };
+
+    async function handleJsonFileImport(file) {
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const isBundle = !!(parsed.manifest && parsed.files);
+        applyImportedData(parsed, isBundle ? `Imported bundle: ${file.name}` : `Imported manifest: ${file.name}`);
+        setDrawerTab('config', true);
+      } catch (err) {
+        setDrawerTab('config', true);
+        showConfigError(`Import failed (${file.name}): ${err.message}`);
+      }
+    }
+
+    $('import-json-btn').onclick = () => $('import-json-file').click();
+    $('import-json-file').onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      handleJsonFileImport(file);
+    };
+
+    $('config-editor').addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        $('apply-config').click();
+      }
+    });
+
+    // Drag-and-drop JSON import anywhere on studio window
+    let dragDepth = 0;
+    window.addEventListener('dragenter', (e) => {
+      if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
+        dragDepth += 1;
+        $('drop-overlay').classList.add('show');
+      }
+    });
+    window.addEventListener('dragover', (e) => {
+      if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault();
+    });
+    window.addEventListener('dragleave', () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) $('drop-overlay').classList.remove('show');
+    });
+    window.addEventListener('drop', (e) => {
+      dragDepth = 0;
+      $('drop-overlay').classList.remove('show');
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file && (file.name.endsWith('.json') || file.type === 'application/json')) {
+        e.preventDefault();
+        handleJsonFileImport(file);
+      }
+    });
+    $('reset-tokens').onclick = () => {
+      state.overrides = {};
+      renderTokensDrawer();
+      document.querySelectorAll('.frame-shell iframe, #player-iframe').forEach((ifr) => {
+        try {
+          const root = ifr.contentDocument && ifr.contentDocument.documentElement;
+          if (!root) return;
+          for (const k of Object.keys(state.baseTokens)) root.style.removeProperty(k);
+        } catch (_) {}
+      });
+      showToast('Tokens reset to tokens.css');
+    };
+    $('copy-tokens').onclick = async () => {
+      await navigator.clipboard.writeText(serializeTokensCss());
+      showToast('Copied CSS variables to clipboard');
+    };
+    $('download-tokens').onclick = () => {
+      const blob = new Blob([serializeTokensCss()], { type: 'text/css' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'tokens.css';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast('Downloaded tokens.css');
+    };
+
+    $('modal-close').onclick = () => $('source-modal').classList.remove('open');
+    $('source-modal').onclick = (e) => { if (e.target === $('source-modal')) $('source-modal').classList.remove('open'); };
+    $('modal-copy').onclick = async () => {
+      await navigator.clipboard.writeText(state.modalSource);
+      showToast('Copied HTML source');
+    };
+
+    // Pan & zoom interactions
+    stageWrap.addEventListener('wheel', (e) => {
+      if (state.mode !== 'canvas') return;
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const rect = stageWrap.getBoundingClientRect();
+        const factor = e.deltaY < 0 ? 1.09 : 0.92;
+        setZoom(state.zoom * factor, e.clientX - rect.left, e.clientY - rect.top);
+      } else {
+        e.preventDefault();
+        state.panX -= e.deltaX;
+        state.panY -= e.deltaY;
+        applyTransform();
+      }
+    }, { passive: false });
+
+    stageWrap.addEventListener('mousedown', (e) => {
+      if (state.mode !== 'canvas') return;
+      if (state.spaceDown || e.button === 1 || e.target === stageWrap || e.target === canvasPlane) {
+        state.dragging = true;
+        stageWrap.classList.add('panning');
+        state.dragStart = { x: e.clientX, y: e.clientY, panX: state.panX, panY: state.panY };
+      }
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!state.dragging) return;
+      state.panX = state.dragStart.panX + (e.clientX - state.dragStart.x);
+      state.panY = state.dragStart.panY + (e.clientY - state.dragStart.y);
+      applyTransform();
+    });
+    window.addEventListener('mouseup', () => {
+      if (!state.dragging) return;
+      state.dragging = false;
+      stageWrap.classList.remove('panning');
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+      if (state.player.open) {
+        if (e.key === 'Escape') closePlayer();
+        else if (e.key.toLowerCase() === 'h') flashPlayerHotspots();
+        else if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey) openPlayer(state.player.startId);
+        else if (e.altKey && e.key === 'ArrowLeft') $('player-back').click();
+        else if (e.altKey && e.key === 'ArrowRight') $('player-forward').click();
+        return;
+      }
+      if (e.code === 'Space' && state.mode === 'canvas') {
+        e.preventDefault();
+        state.spaceDown = true;
+        stageWrap.classList.add('space-ready');
+      } else if (e.key === 'Escape') {
+        $('source-modal').classList.remove('open');
+      } else if (e.key.toLowerCase() === 'p') {
+        openPlayer();
+      } else if (e.key.toLowerCase() === 'l') {
+        $('toggle-flows').click();
+      } else if (e.key.toLowerCase() === 't') {
+        $('toggle-tokens').click();
+      } else if (e.key.toLowerCase() === 'j') {
+        $('toggle-config').click();
+      } else if (e.key.toLowerCase() === 'g') {
+        setMode(state.mode === 'canvas' ? 'grid' : 'canvas');
+      } else if (e.key.toLowerCase() === 'f') {
+        fitAllFrames();
+      } else if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey) {
+        $('reload-all').click();
+      } else if (e.key === '=' || e.key === '+') {
+        setZoom(state.zoom * 1.15);
+      } else if (e.key === '-') {
+        setZoom(state.zoom / 1.15);
+      } else if (e.key === '0') {
+        setZoom(1);
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        state.spaceDown = false;
+        stageWrap.classList.remove('space-ready');
+      }
+    });
+    window.addEventListener('resize', () => {
+      if (state.mode === 'grid') renderFrames();
+      if (state.player.open) renderPlayerChrome();
+    });
+
+    // Boot
+    (async () => {
+      await loadTokens(true);
+      await loadManifest(true);
+      setInterval(pollChangedFiles, 1500);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deployment Console — Mobile</title>
+  <link rel="stylesheet" href="../tokens.css" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--color-bg);
+      color: var(--color-fg);
+      font-family: var(--font-sans);
+      font-size: var(--body-size);
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+    .shell {
+      padding: 20px 16px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: var(--color-accent);
+      color: var(--color-accent-fg);
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-fg-muted);
+    }
+    .alert-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-left: 3px solid var(--color-warning);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .alert-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-warning);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .alert-title { font-size: 16px; font-weight: 600; margin: 0; }
+    .alert-body { font-size: 13px; color: var(--color-fg-muted); margin: 0; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn {
+      height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-elevated);
+      color: var(--color-fg);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-accent-fg);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .metric {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+    }
+    .metric-label { font-size: 11.5px; color: var(--color-fg-muted); margin-bottom: 6px; }
+    .metric-val { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .sec-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-fg-muted);
+      margin: 0 0 10px 0;
+    }
+    .list {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .item {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .item:last-child { border-bottom: 0; }
+    .item-name { font-size: 13.5px; font-weight: 500; }
+    .item-sub { font-family: var(--font-mono); font-size: 11px; color: var(--color-fg-muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
+    .dot.warn { background: var(--color-warning); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="head">
+      <div class="brand">
+        <span class="mark">N</span>
+        <span>Northstar</span>
+      </div>
+      <a href="#" class="chip" data-goto="ops-dashboard" style="text-decoration:none;cursor:pointer" title="Open Desktop Console">Desktop ↗</a>
+    </header>
+
+    <section class="alert-card">
+      <div class="alert-top"><span>Canary Hold</span><span>14:22 UTC</span></div>
+      <h1 class="alert-title">billing-worker v4.9.0-rc2</h1>
+      <p class="alert-body">p95 latency rose +14ms at 15% traffic weight. Rollout paused automatically pending confirmation.</p>
+      <div class="btn-row">
+        <button class="btn">Rollback</button>
+        <button class="btn btn-primary">Promote 50%</button>
+      </div>
+    </section>
+
+    <section class="metrics">
+      <div class="metric">
+        <div class="metric-label">Availability</div>
+        <div class="metric-val">99.98%</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Edge p95</div>
+        <div class="metric-val">38.4 ms</div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="sec-title">Active Services</h2>
+      <div class="list">
+        <div class="item">
+          <div>
+            <div class="item-name">api-gateway</div>
+            <div class="item-sub">v2.18.3 · 8f3c19a</div>
+          </div>
+          <span class="dot"></span>
+        </div>
+        <div class="item">
+          <div>
+            <div class="item-name">billing-worker</div>
+            <div class="item-sub">v4.9.0-rc2 · 15% canary</div>
+          </div>
+          <span class="dot warn"></span>
+        </div>
+        <div class="item">
+          <div>
+            <div class="item-name">auth-edge</div>
+            <div class="item-sub">v1.12.7 · 3a77d21</div>
+          </div>
+          <span class="dot"></span>
+        </div>
+        <div class="item">
+          <div>
+            <div class="item-name">search-indexer</div>
+            <div class="item-sub">v3.4.1 · 9b02f14</div>
+          </div>
+          <span class="dot"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
