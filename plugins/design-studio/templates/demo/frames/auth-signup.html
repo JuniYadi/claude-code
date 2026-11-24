@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account — Northstar Cloud</title>
+  <link rel="stylesheet" href="../tokens.css" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--color-bg);
+      color: var(--color-fg);
+      font-family: var(--font-sans);
+      font-size: var(--body-size);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      min-height: 100vh;
+    }
+
+    .brand-pane {
+      background: var(--color-surface);
+      border-right: 1px solid var(--color-border);
+      padding: 40px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      background: var(--color-accent);
+      color: var(--color-accent-fg);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .hero-block { max-width: 470px; }
+    .kicker {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-fg-muted);
+      margin-bottom: 14px;
+    }
+    .headline {
+      margin: 0 0 24px 0;
+      font-family: var(--font-display);
+      font-size: 44px;
+      font-weight: 400;
+      line-height: 1.08;
+    }
+    .checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .checklist li {
+      display: grid;
+      grid-template-columns: 20px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: var(--color-fg-muted);
+      font-size: 14px;
+    }
+    .checklist strong { color: var(--color-fg); font-weight: 500; }
+    .check-icon { color: var(--color-success); margin-top: 2px; }
+
+    .env-note {
+      padding: 14px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg);
+      font-size: 12.5px;
+      color: var(--color-fg-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mono { font-family: var(--font-mono); font-size: 11.5px; color: var(--color-fg); }
+
+    .form-pane {
+      display: grid;
+      place-items: center;
+      padding: 40px 32px;
+    }
+    .card {
+      width: 100%;
+      max-width: 410px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    .card-head h1 {
+      margin: 0 0 6px 0;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .card-head p { margin: 0; color: var(--color-fg-muted); font-size: 14px; }
+
+    form { display: flex; flex-direction: column; gap: 15px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 13px; font-weight: 500; }
+
+    input, select {
+      height: 40px;
+      padding: 0 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-fg);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: var(--color-accent); }
+
+    .strength {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .bar { height: 3px; border-radius: 99px; background: var(--color-border); }
+    .bar.ok { background: var(--color-success); }
+    .hint { font-size: 12px; color: var(--color-fg-muted); }
+
+    .btn-primary {
+      height: 42px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-accent);
+      background: var(--color-accent);
+      color: var(--color-accent-fg);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary:hover { filter: brightness(1.08); }
+
+    .terms {
+      font-size: 12px;
+      color: var(--color-fg-muted);
+      line-height: 1.5;
+    }
+    .foot-note {
+      text-align: center;
+      font-size: 13.5px;
+      color: var(--color-fg-muted);
+    }
+    .link { color: var(--color-accent); text-decoration: none; font-weight: 500; cursor: pointer; }
+    .link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="brand-pane">
+      <div class="brand-row">
+        <span class="mark">N</span>
+        <span>Northstar Cloud</span>
+      </div>
+
+      <div class="hero-block">
+        <div class="kicker">Workspace Provisioning</div>
+        <h2 class="headline">Deploy your first cluster in under two minutes.</h2>
+        <ul class="checklist">
+          <li>
+            <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>
+            <span><strong>Zero-config canary gates</strong> — automatic latency and 5xx hold before promotion.</span>
+          </li>
+          <li>
+            <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>
+            <span><strong>Instant rollback</strong> — revert any service to a prior immutable build in one click.</span>
+          </li>
+          <li>
+            <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg>
+            <span><strong>Team RBAC &amp; audit trails</strong> — scoped deploy keys and signed commit verification.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="env-note">
+        <span>Default primary region</span>
+        <span class="mono">ap-southeast-1 (SG-04)</span>
+      </div>
+    </section>
+
+    <section class="form-pane">
+      <div class="card">
+        <div class="card-head">
+          <h1>Create your workspace</h1>
+          <p>Start free with up to 3 services and 18 edge POPs.</p>
+        </div>
+
+        <form data-goto="ops-dashboard">
+          <div class="two-col">
+            <div class="field">
+              <label for="name">Full name</label>
+              <input id="name" type="text" value="Alex Chen" required />
+            </div>
+            <div class="field">
+              <label for="org">Organization</label>
+              <input id="org" type="text" value="Northstar Labs" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="email">Work email</label>
+            <input id="email" type="email" value="alex@northstar.dev" required />
+          </div>
+
+          <div class="field">
+            <label for="region">Primary region</label>
+            <select id="region">
+              <option selected>Singapore (ap-southeast-1)</option>
+              <option>Tokyo (ap-northeast-1)</option>
+              <option>Frankfurt (eu-central-1)</option>
+              <option>Virginia (us-east-1)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="pw">Password</label>
+            <input id="pw" type="password" value="••••••••••••••" required />
+            <div class="strength">
+              <span class="bar ok"></span>
+              <span class="bar ok"></span>
+              <span class="bar ok"></span>
+              <span class="bar"></span>
+            </div>
+            <span class="hint">Strong · 12+ characters with mixed symbols</span>
+          </div>
+
+          <button type="submit" class="btn-primary" data-goto="ops-dashboard">Create Workspace &amp; Launch Console →</button>
+          <div class="terms">By continuing you agree to Northstar's Service Terms and Security Policy.</div>
+        </form>
+
+        <div class="foot-note">
+          Already have an account? <a href="#" class="link" data-goto="auth-login">Sign in</a>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

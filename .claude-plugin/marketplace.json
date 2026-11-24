@@ -9,6 +9,13 @@
       "description": "PRD use case, then ADR decision, then tagged code. Checker, git hooks, CI template and skills.",
       "version": "1.0.0",
       "category": "productivity"
+    },
+    {
+      "name": "design-studio",
+      "source": "./plugins/design-studio",
+      "description": "Local offline HTML design canvas with live CSS tokens, SVG flow connectors, interactive Play mode, and JSON/bundle import-export.",
+      "version": "1.0.0",
+      "category": "design"
     }
   ]
 }
